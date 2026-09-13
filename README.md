@@ -12,6 +12,25 @@ Nasceu de uma necessidade de estudo: traduzir sem transformar notas em parágraf
 
 ## Veja uma tradução real
 
+Um livro aberto em inglês, traduzido para pt-BR: **Significant Statistics**, de John Morgan Russell (Virginia Tech, 2025). A seção 2.1 passou pelo motor do app; abaixo, um recorte do original e da tradução, com o CSS da obra preservado.
+
+![Livro real em inglês e pt-BR: tabela de frequências com os mesmos dados, fórmulas e identificação.](docs/images/statistics-tabela.png)
+
+**119 elementos traduzidos, duas tabelas e 13 ocorrências de imagens, incluindo 12 fórmulas.** Valores, arquivos de imagem, identificadores e links internos foram conferidos. Os comparativos mostram o **EPUB**, não uma réplica do PDF; o texto em português pode mudar quebras e larguras automáticas.
+
+<details>
+<summary>Veja a fotografia e sua legenda traduzida</summary>
+
+![Fotografia original preservada, com Figura 2.1 e legenda em português brasileiro.](docs/images/statistics-figura.png)
+
+</details>
+
+Obra e comparativos sob **[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)**; fotografia identificada como domínio público na fonte. Tradução e montagem não oficiais, sem endosso da universidade. [Fonte, créditos completos, reprodução e limites](examples/significant-statistics/README.md).
+
+Equivalente API registrado: **US$ 0,7922**, incluindo tentativas recusadas, retomada e auditoria. Não é fatura nem custo de desenvolvimento. [Evidência da execução](examples/significant-statistics/validacao.json).
+
+## Exemplo sintético para testar o pipeline
+
 Um minilivro autoral de dois capítulos, com dados fictícios, passou pelo motor do aplicativo. À esquerda, o original; à direita, a tradução para pt-BR. O conteúdo abaixo foi extraído dos dois EPUBs e renderizado no mesmo navegador, com **o mesmo CSS**, sem retoques manuais na tradução.
 
 ![Original e tradução lado a lado: tabela numerada com valores idênticos, equação preservada e nota separada do texto.](docs/images/comparativo-tabela.png)
@@ -127,7 +146,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 22 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além da execução real do minilivro documentada acima. Isso verifica contratos do pipeline e esta amostra; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 23 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 
@@ -139,4 +158,4 @@ Não é um novo modelo de tradução, nem uma reivindicação de ter inventado t
 
 Código deste projeto sob [AGPL-3.0](LICENSE), considerando o uso de PyMuPDF. Créditos e dependências em [NOTICE](NOTICE.md). Sem vínculo oficial com OpenAI ou com os projetos citados.
 
-O repositório não distribui obras de terceiros, suas traduções, credenciais ou arquivos pessoais. A única amostra incluída é o minilivro sintético criado para esta demonstração. Use apenas materiais para os quais você tenha os direitos ou permissões necessários.
+O repositório inclui um minilivro sintético autoral e comparativos de um trecho de obra aberta, com licença e atribuição explícitas. Não distribui livros privados, credenciais ou arquivos pessoais. Use apenas materiais para os quais você tenha os direitos ou permissões necessários.

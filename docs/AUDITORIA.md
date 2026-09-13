@@ -18,7 +18,7 @@ python tradutor.py self-test
 python -m py_compile tradutor.py app.py
 ```
 
-20 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
+23 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
 
 | Contrato | Cobertura |
 | --- | --- |
@@ -45,6 +45,8 @@ Houve também um teste manual real, curto, com Codex CLI e GPT-5.6 Luna: duas fr
 - Custo por modelo e estado indisponível quando falta telemetria.
 
 ## O que não está certificado
+
+O [teste real com Significant Statistics](../examples/significant-statistics/README.md) acrescentou um caso licenciado com 119 elementos, duas tabelas e fórmulas rasterizadas. Motivou a tradução de `summary` (com regressão automatizada) e instruções explícitas para não traduzir atributos. Os reenvios foram contabilizados. O relatório descreve também limites observados: metadados/alt em inglês, tradução do título descritivo de uma foto e soluções recolhidas no PDF. Os comparativos públicos são do EPUB.
 
 Fidelidade visual universal, EPUBCheck, tradução literária, suporte a qualquer estrutura EPUB, OCR, notas de todos os estilos, custo exato da conta e redistribuição de qualquer obra. O histórico pessoal com três livros não foi publicado nem convertido em prova de cobertura geral.
 

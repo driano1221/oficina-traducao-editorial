@@ -716,6 +716,9 @@ Devolva SOMENTE um objeto JSON válido, com exatamente as mesmas chaves e na mes
 REGRAS OBRIGATÓRIAS:
 1. Traduza integralmente, sem resumir, explicar, omitir ou acrescentar conteúdo.
 2. Preserve todas as tags HTML, atributos, links, números, citações e nomes próprios.
+   Traduza apenas nós de texto entre tags. NÃO traduza valores de atributos, inclusive
+   aria-label, alt, title, class, style e data-*. Esses valores devem ficar literalmente
+   iguais à entrada, mesmo em inglês; qualquer mudança torna a resposta inválida.
 3. Preserve literalmente cada token [[[MATH_...]]]; ele representa uma fórmula protegida.
 4. Não traduza títulos de obras dentro de referências bibliográficas.
 5. Em texto técnico, prefira português acadêmico brasileiro natural e preciso.
@@ -1382,9 +1385,9 @@ def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
             source_counts["equacoes"] += len(body.select("figure.IMGE, figure.IMGD, math, .math"))
             source_counts["tabelas"] += len(body.find_all("table"))
 
-            candidates = body.find_all(["h1", "h2", "h3", "h4", "p", "li", "th", "td", "caption", "figcaption"])
+            candidates = body.find_all(["h1", "h2", "h3", "h4", "p", "li", "th", "td", "caption", "figcaption", "summary"])
             for item_index, node in enumerate(candidates, 1):
-                if node.find_parent(["h1", "h2", "h3", "h4", "p", "li", "th", "td", "caption"]):
+                if node.find_parent(["h1", "h2", "h3", "h4", "p", "li", "th", "td", "caption", "summary"]):
                     continue
                 if not node.get_text(" ", strip=True):
                     continue

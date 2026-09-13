@@ -25,7 +25,7 @@ def synthetic_epub(path, inline_cut=False, shared_chapters=False):
 <figure id="f1"><img src="images/plot.svg" alt="Original"/><figcaption>Figure 1: Test.</figcaption></figure>
 <table id="table1"><caption>Table 1: Values.</caption><tr><th>Value</th><td>12</td></tr></table>
 <p id="equation">Equation <math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mn>1</mn></math></p>
-<p id="note1">A synthetic reference.</p>''' + pagebreak + paragraph + '</body></html>'
+<p id="note1">A synthetic reference.</p><details><summary id="solution"><strong>Solution</strong></summary><p>A test answer.</p></details>''' + pagebreak + paragraph + '</body></html>'
     second = '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Second</title></head><body><h1>Chapter 2</h1><p>Untranslated second chapter.</p></body></html>'
     second_href = 'chapter.xhtml#later' if shared_chapters else 'second.xhtml'
     files = {
@@ -63,7 +63,7 @@ class PipelineTests(unittest.TestCase):
 
     def run_epub(self, config):
         def translate(config, items, log):
-            return {item['id']: item['source'].replace('A test', 'Um teste').replace('Figure 1', 'Figura 1').replace('Table 1', 'Tabela 1') for item in items}
+            return {item['id']: item['source'].replace('A test', 'Um teste').replace('Figure 1', 'Figura 1').replace('Table 1', 'Tabela 1').replace('Solution', 'Solução') for item in items}
         fake_document = MagicMock()
         fake_document.__enter__.return_value = fake_document
         fake_document.page_count = 2
@@ -88,6 +88,14 @@ class PipelineTests(unittest.TestCase):
         inventory = app.epub_inventory(self.source)
         self.assertEqual(len(inventory['chapters']), 2)
         self.assertEqual(inventory['printed_pages'], 2)
+
+    def test_disclosure_summary_is_translated_with_structure_preserved(self):
+        config = self.config(chapters=1)
+        self.run_epub(config)
+        with zipfile.ZipFile(config.output / 'livro_ptbr.epub') as archive:
+            doc = BeautifulSoup(archive.read('OEBPS/chapter.xhtml'), 'html.parser')
+        self.assertEqual(doc.select_one('details > summary#solution > strong').get_text(), 'Solução')
+        self.assertEqual(doc.select_one('details > p').get_text(), 'Um teste answer.')
 
     def test_math_and_image_roundtrip(self):
         source = '<b>Test</b><img src="x.svg"/><math><mi>x</mi></math><span class="math">x+1</span>'

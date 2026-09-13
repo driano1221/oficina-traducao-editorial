@@ -1,0 +1,49 @@
+{
+  "data": "2026-09-13",
+  "fonte_url": "https://vtechworks.lib.vt.edu/bitstreams/0345ade7-4647-4dcc-8d6b-b88c172b3500/download",
+  "obra": "Russell, John Morgan (2025). Significant Statistics: An Introduction to Statistics.",
+  "licenca_conteudo_e_comparativos": "CC BY-SA 4.0; fotografia Figura 2.1 em domínio público conforme crédito da obra",
+  "recorte": "Seção 2.1 completa; não é o capítulo 2 inteiro",
+  "sha256_epub_oficial": "f96dd4dbfef4b35979ccc171d7b21809833ca02fff5fdd5e45351fe4dd3e8fc9",
+  "sha256_recorte_original": "598188674c7c6b903e1d622e8d7d106ff85c160f3e3c75cd185e7c413e34e17d",
+  "sha256_recorte_traduzido": "0af9ef7ae199d591e4bbb1ef76afa365afbf3236f051fd0846fcf366c899d616",
+  "sha256_motor": "aacf26227488f4a08a72ddb7fbd6aa392033418c163d6a475ac2fd0bb58d769d",
+  "elementos_traduzidos": 119,
+  "tabelas": 2,
+  "celulas_de_dados": 54,
+  "ocorrencias_de_imagens": 13,
+  "formulas_em_imagens": 12,
+  "legendas_de_figuras_e_tabelas": [
+    "2.1",
+    "2.2",
+    "2.3"
+  ],
+  "arquivos_fora_do_xhtml_intactos": 28,
+  "estrutura_tags_atributos_links": "idêntica no body, exceto lang/xml:lang atualizados nos nós traduzidos",
+  "valores_numericos_das_tabelas": "idênticos, sem conversão de unidades",
+  "links_internos": "todos resolvem para um id existente",
+  "auditoria_automatica": {
+    "status": "aprovado",
+    "pares_revisados": 119,
+    "problemas": []
+  },
+  "modelo": "gpt-5.6-sol",
+  "chamadas_registradas_incluindo_reenvios": 20,
+  "tokens": {
+    "input_tokens": 345362,
+    "cached_input_tokens": 242560,
+    "output_tokens": 14199,
+    "reasoning_output_tokens": 768
+  },
+  "equivalente_api_usd": 0.792213,
+  "cobranca_real_verificada": false,
+  "limites": [
+    "Comparativos são recortes de leitura do XHTML dos EPUBs, não do PDF.",
+    "Fontes e CSS originais, sem retoques de texto ou dimensões internas para a captura.",
+    "Atributos de acessibilidade e metadados permanecem no idioma de origem.",
+    "O título descritivo da foto nos créditos foi traduzido; autor, identificação e URL foram mantidos.",
+    "PDF local inspecionado em sete páginas: soluções recolhidas na impressão, caixas divididas e rótulo genérico na capa. Não publicado como exemplo fiel.",
+    "O original chama as tabelas de Figure 2.2 e Figure 2.3: mantido como Figura, sem renumerar.",
+    "A pergunta sobre estudantes termina pedindo gráfico de eleitores no original; inconsistência preservada, não corrigida silenciosamente."
+  ]
+}
