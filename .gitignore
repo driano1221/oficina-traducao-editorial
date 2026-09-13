@@ -1,0 +1,23 @@
+# Livros, entregas, credenciais e ambientes são locais.
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.codex/
+resultados/
+outputs/
+work/
+tmp/
+build/
+dist/
+*.spec
+*.log
+*.epub
+*.pdf
+*.docx
+*.exe
+*.zip
+*.key
+*.pem
