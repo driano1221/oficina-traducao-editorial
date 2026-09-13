@@ -10,6 +10,36 @@ Nasceu de uma necessidade de estudo: traduzir sem transformar notas em parágraf
 
 [![Testes](https://github.com/driano1221/oficina-traducao-editorial/actions/workflows/tests.yml/badge.svg)](https://github.com/driano1221/oficina-traducao-editorial/actions/workflows/tests.yml)
 
+## Veja uma tradução real
+
+Um minilivro autoral de dois capítulos, com dados fictícios, passou pelo motor do aplicativo. À esquerda, o original; à direita, a tradução para pt-BR. O conteúdo abaixo foi extraído dos dois EPUBs e renderizado no mesmo navegador, com **o mesmo CSS**, sem retoques manuais na tradução.
+
+![Original e tradução lado a lado: tabela numerada com valores idênticos, equação preservada e nota separada do texto.](docs/images/comparativo-tabela.png)
+
+**48 elementos traduzidos.** A tabela mantém seus valores; a equação, seus símbolos; a figura, seus bytes; as notas, seus links de ida e volta. Há diferenças naturais de quebra de linha. Isso demonstra este EPUB, não fidelidade universal em PDF.
+
+<details>
+<summary>Veja também a figura, a legenda e as notas</summary>
+
+![Figura idêntica nos dois idiomas, com legenda numerada traduzida, lista e nota com retorno.](docs/images/comparativo-figura.png)
+
+O gráfico usa eixos e símbolos independentes do idioma. O exemplo não demonstra tradução de texto dentro de imagens.
+
+</details>
+
+<details>
+<summary>Interface do aplicativo com o minilivro selecionado</summary>
+
+![Interface real do aplicativo no Windows, com seleção de dois capítulos, modelo e estimativa prévia de custo.](docs/images/interface.png)
+
+A tela mostra a configuração anterior à execução, não o custo final. A estimativa inicial subestimou o uso deste exemplo; os números medidos estão abaixo.
+
+</details>
+
+[Original em inglês](examples/minilivro/publicados/original.epub) · [Tradução em pt-BR](examples/minilivro/publicados/traduzido.epub) · [Como reproduzir e o que foi verificado](examples/minilivro/README.md)
+
+Equivalente API registrado: **US$ 0,0875 na execução final**; **US$ 0,1791 incluindo a primeira execução e a revisão de terminologia**. Não é fatura. A [evidência publicada](examples/minilivro/publicados/validacao.json) não contém caminhos pessoais nem dados de autenticação.
+
 ## Comece aqui
 
 | Quero… | Onde |
@@ -97,7 +127,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 20 testes automatizados com dados sintéticos, sem chamadas pagas, além de um teste manual curto da integração com Codex CLI. Isso verifica contratos do pipeline; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 22 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além da execução real do minilivro documentada acima. Isso verifica contratos do pipeline e esta amostra; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 
@@ -109,4 +139,4 @@ Não é um novo modelo de tradução, nem uma reivindicação de ter inventado t
 
 Código deste projeto sob [AGPL-3.0](LICENSE), considerando o uso de PyMuPDF. Créditos e dependências em [NOTICE](NOTICE.md). Sem vínculo oficial com OpenAI ou com os projetos citados.
 
-O repositório não distribui livros, traduções de obras, credenciais ou arquivos pessoais. Use apenas materiais para os quais você tenha os direitos ou permissões necessários.
+O repositório não distribui obras de terceiros, suas traduções, credenciais ou arquivos pessoais. A única amostra incluída é o minilivro sintético criado para esta demonstração. Use apenas materiais para os quais você tenha os direitos ou permissões necessários.

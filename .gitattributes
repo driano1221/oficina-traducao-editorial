@@ -3,3 +3,6 @@
 *.md text eol=lf
 *.ps1 text eol=crlf
 *.yml text eol=lf
+*.xhtml text eol=lf
+*.css text eol=lf
+*.svg text eol=lf

@@ -42,6 +42,8 @@ Copyright (c) 2026 driano1221. Código deste projeto: GNU Affero General Public 
 
 As dependências são instaladas separadamente. Os avisos delas permanecem aplicáveis. Para binários, leia docs/BUILD_E_DISTRIBUICAO.md e inventarie também as dependências transitivas.
 
-Não distribuímos livros, traduções privadas, imagens editoriais, fontes extraídas de obras ou credenciais. A licença do código não concede direitos sobre documentos processados.
+Não distribuímos livros de terceiros, traduções privadas, imagens editoriais de terceiros, fontes extraídas de obras ou credenciais. A licença do código não concede direitos sobre documentos processados.
+
+Exceção autoral de demonstração: texto, dados fictícios, CSS e diagrama em `examples/minilivro/fonte`, bem como os dois EPUBs e comparativos derivados dessa amostra, são dedicados sob [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Foram criados com assistência de IA especificamente para este projeto, sem conteúdo do livro Patterns. Scripts continuam sob AGPL-3.0. O screenshot da interface documenta o aplicativo e não muda a licença do código.
 
 OpenAI, Codex e nomes dos projetos relacionados pertencem aos seus respectivos titulares. Não há afiliação oficial.

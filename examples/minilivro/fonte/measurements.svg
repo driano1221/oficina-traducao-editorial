@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="290" viewBox="0 0 600 290">
+<rect width="600" height="290" rx="12" fill="#eff4ee"/>
+<g stroke="#d5dfd5" stroke-width="1"><path d="M60 220H560M60 176H560M60 132H560M60 88H560M60 44H560"/></g>
+<g stroke="#748c83" stroke-width="1.4"><path d="M60 25V242H572" fill="none"/></g>
+<g fill="#687e76" font-family="Arial,sans-serif" font-size="13" text-anchor="middle"><text x="90" y="261">1</text><text x="240" y="261">2</text><text x="390" y="261">3</text><text x="540" y="261">4</text></g>
+<g fill="#687e76" font-family="Arial,sans-serif" font-size="13" text-anchor="end"><text x="45" y="225">0</text><text x="45" y="181">2</text><text x="45" y="137">4</text><text x="45" y="93">6</text><text x="45" y="49">8</text></g>
+<path d="M90 176L540 44" fill="none" stroke="#14666b" stroke-width="3"/>
+<path d="M240 132V110M390 88V110" stroke="#b96b4b" stroke-width="2" stroke-dasharray="4 4"/>
+<g fill="#c77956" stroke="#fffdf8" stroke-width="3"><circle cx="90" cy="176" r="7"/><circle cx="240" cy="110" r="7"/><circle cx="390" cy="110" r="7"/><circle cx="540" cy="44" r="7"/></g>
+<g fill="#764c3d" font-family="Arial,sans-serif" font-size="12" font-weight="bold"><text x="78" y="157">A</text><text x="229" y="93">B</text><text x="397" y="131">C</text><text x="526" y="29">D</text></g>
+<g fill="#164b4e" font-family="Georgia,serif" font-style="italic" font-size="17"><text x="437" y="50">y = 2x</text><text x="577" y="246">x</text><text x="40" y="23">y</text></g></svg>

@@ -1,0 +1,29 @@
+{
+  "data": "2026-09-13",
+  "motor_commit": "d06f9c1",
+  "modelo": "gpt-5.6-sol",
+  "origem": "Minilivro sintético autoral, sem trechos de terceiros",
+  "sha256_original": "9a27c356e2a1a80db9938763b478214e3540c2c8eb2877b4ea31e6e944c2158a",
+  "sha256_traduzido": "c9665b93fe05fc835bfa3e9dcfb1f5ea7bad31cdf69e44981b9a32e04e018032",
+  "elementos": 48,
+  "objetos": {
+    "imagens": 1,
+    "figuras": 1,
+    "equacoes": 1,
+    "tabelas": 1
+  },
+  "verificacoes": {
+    "arquivos_fora_do_texto_intactos": true,
+    "capitulo_1_ids_links_dados_formulas": true,
+    "capitulo_2_ids_links_dados_formulas": true
+  },
+  "auditoria_automatica": {
+    "status": "aprovado",
+    "pares_revisados": 48,
+    "problemas": []
+  },
+  "custo_equivalente_api_usd_execucao_final": 0.087464,
+  "custo_equivalente_api_usd_incluindo_primeira_tentativa": 0.17914,
+  "cobranca_real_verificada": false,
+  "observacao": "Primeira execução localizou MSE para EQM na prosa. Nova execução preservou a sigla por instrução editorial explícita. Não houve retoque manual da tradução. Comparativos mostram XHTML do EPUB, não o PDF refluído."
+}

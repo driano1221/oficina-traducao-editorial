@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><meta charset="utf-8"/><title>Chapter 1 - Measuring prediction error</title><link rel="stylesheet" href="style.css"/></head><body>
+<p class="kicker">Field notes / A synthetic learning guide</p>
+<h1 id="chapter1">Chapter 1<br/>Measuring prediction error</h1>
+<p class="lead">A useful prediction is not necessarily an exact one. Before comparing models, decide what counts as an error.</p>
+<p>Consider four fictional measurements. The reference rule predicts <i>y</i> = 2<i>x</i>. We define the residual as the observed value minus the prediction, so a positive residual means that the rule underestimated the observation.<a href="#note1" id="ref1"><sup>1</sup></a></p>
+<table id="table1"><caption>Table 1. Four observations and a fixed prediction rule.</caption><thead><tr><th scope="col">Sample</th><th scope="col">x</th><th scope="col">Observed y</th><th scope="col">Predicted y</th><th scope="col">Residual</th></tr></thead><tbody>
+<tr><td>A</td><td>1</td><td>2</td><td>2</td><td>0</td></tr>
+<tr><td>B</td><td>2</td><td>5</td><td>4</td><td>1</td></tr>
+<tr><td>C</td><td>3</td><td>5</td><td>6</td><td>-1</td></tr>
+<tr><td>D</td><td>4</td><td>8</td><td>8</td><td>0</td></tr>
+</tbody></table>
+<h2 id="squared-error">Why square the residuals?</h2>
+<p>The average residual is zero, but two predictions are wrong. Squaring prevents positive and negative errors from cancelling each other.</p>
+<div class="formula"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mi>MSE</mi><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover><msup><mrow><mo>(</mo><msub><mi>y</mi><mi>i</mi></msub><mo>−</mo><msub><mover><mi>y</mi><mo>^</mo></mover><mi>i</mi></msub><mo>)</mo></mrow><mn>2</mn></msup></math></div>
+<p>For Table 1, MSE = (0 + 1 + 1 + 0) / 4 = <strong>0.5</strong>. The mean absolute error is also 0.5. This agreement is specific to these numbers; the two measures are not interchangeable.</p>
+<aside role="doc-endnotes"><p id="note1" role="doc-footnote"><strong>1.</strong> All observations in this guide were invented for an editorial demonstration. They are not experimental findings. <a href="#ref1" role="doc-backlink">↩</a></p></aside>
+<p class="footer">Oficina de Tradução Editorial / Demonstration 01</p>
+</body></html>

@@ -21,3 +21,7 @@ dist/
 *.zip
 *.key
 *.pem
+
+# Apenas estes EPUBs sintéticos autorais fazem parte da demonstração pública.
+!examples/minilivro/publicados/original.epub
+!examples/minilivro/publicados/traduzido.epub

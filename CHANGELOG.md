@@ -1,5 +1,13 @@
 # Histórico
 
+## Não lançado — 2026-09-13
+
+- Minilivro sintético de dois capítulos, original e tradução real em EPUB.
+- Comparativos visuais de tabela/equação e figura/notas, mais screenshot da interface.
+- Fonte reproduzível, verificações de integridade e custo sanitizado.
+- Dois testes dos artefatos publicados; suíte com 22 testes.
+- Limites da estimativa prévia e do PDF refluído documentados no exemplo.
+
 ## 0.1.0-beta — 2026-09-12
 
 Primeira versão pública, em código-fonte.
