@@ -95,6 +95,28 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(engine.is_chapter_label('2.1 Background'))
         self.assertFalse(engine.is_chapter_label('Figure 2.1 Results'))
 
+    def test_chapter_scope_stops_before_next_part_divider(self):
+        docs = ['chapter1.xhtml', 'part2.xhtml', 'chapter2.xhtml']
+        toc = [
+            ('chapter1.xhtml', '1. First', 2),
+            ('part2.xhtml', 'Part Two', 1),
+            ('chapter2.xhtml', '2. Second', 2),
+        ]
+        chapters = [('chapter1.xhtml', '1. First'), ('chapter2.xhtml', '2. Second')]
+        self.assertEqual(engine.chapter_document_slice(docs, toc, chapters, 1), {'chapter1.xhtml'})
+
+    def test_epub_rerun_removes_stale_extracted_sections(self):
+        config = self.config(chapters=1)
+        source_dir = config.output / 'fonte_epub'
+        source_dir.mkdir(parents=True)
+        stale = source_dir / 'stale.xhtml'
+        stale.write_text('old scope', encoding='utf-8')
+
+        self.run_epub(config)
+
+        self.assertFalse(stale.exists())
+        self.assertEqual(len(list(source_dir.glob('*.xhtml'))), 1)
+
     def test_disclosure_summary_is_translated_with_structure_preserved(self):
         config = self.config(chapters=1)
         self.run_epub(config)
@@ -113,6 +135,13 @@ class PipelineTests(unittest.TestCase):
         source = '<span class="math"><img src="equation.svg"/></span>'
         protected, tokens = engine.protect_epub_nontext(source, 'test')
         self.assertEqual(len(tokens), 1)
+        self.assertEqual(engine.restore_math(protected, tokens), str(BeautifulSoup(source, 'html.parser')))
+
+    def test_empty_navigation_anchor_is_protected(self):
+        source = 'Before <a class="calibre12" id="filepos1"></a> after.'
+        protected, tokens = engine.protect_epub_nontext(source, 'test')
+        self.assertEqual(len(tokens), 1)
+        self.assertNotIn('<a ', protected)
         self.assertEqual(engine.restore_math(protected, tokens), str(BeautifulSoup(source, 'html.parser')))
 
     def test_changed_link_rejected(self):
@@ -142,6 +171,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(report['status'], 'revisar')
         self.assertEqual({problem['tipo'] for problem in report['problemas']}, {'número alterado', 'glossário não aplicado'})
         self.assertEqual(set(report['itens_para_auditoria_semantica']), {'number', 'term'})
+        self.assertIn("Fonte: ['201%']", report['problemas'][0]['explicacao'])
 
     def test_local_validation_sends_only_risky_prose_to_semantic_audit(self):
         report = engine.local_editorial_validation([
@@ -150,6 +180,14 @@ class PipelineTests(unittest.TestCase):
         ])
         self.assertNotIn('heading', report['itens_para_auditoria_semantica'])
         self.assertIn('long', report['itens_para_auditoria_semantica'])
+
+    def test_written_english_number_may_become_a_digit(self):
+        report = engine.local_editorial_validation([{
+            'id': 'movement',
+            'fonte': 'The May Fourth Movement began on May 4, 1919.',
+            'traducao': 'O Movimento de 4 de Maio começou em 4 de maio de 1919.',
+        }])
+        self.assertNotIn('número alterado', {problem['tipo'] for problem in report['problemas']})
 
     def test_semantic_audit_receives_only_locally_selected_pairs(self):
         config = self.config()
@@ -181,6 +219,13 @@ class PipelineTests(unittest.TestCase):
         item = {'id': 'p1', 'source': '<strong>A causal effect</strong>.', 'math': {}, 'tags': ['strong']}
         first = engine.JobConfig(self.source, self.root / 'first', [1], memory_db=memory)
         second = engine.JobConfig(self.source, self.root / 'second', [1], memory_db=memory)
+        stale_source = first.output / 'fontes_editoriais' / 'bloco_099.json'
+        stale_target = first.output / 'traduzidos_editoriais' / 'bloco_099.json'
+        stale_meta = first.output / 'traduzidos_editoriais' / 'bloco_099.meta.json'
+        stale_source.parent.mkdir(parents=True)
+        stale_target.parent.mkdir(parents=True)
+        for stale in (stale_source, stale_target, stale_meta):
+            stale.write_text('{}', encoding='utf-8')
 
         def translate(prompt, cwd, output, model):
             output.write_text(json.dumps({'p1': '<strong>Um efeito causal</strong>.'}), encoding='utf-8')
@@ -192,6 +237,9 @@ class PipelineTests(unittest.TestCase):
             result_second = engine.translate_editorial_chunks(second, [item], lambda _: None)
         self.assertEqual(result_first, result_second)
         self.assertEqual(run.call_count, 1)
+        self.assertFalse(stale_source.exists())
+        self.assertFalse(stale_target.exists())
+        self.assertFalse(stale_meta.exists())
         self.assertTrue(memory.exists())
         self.assertEqual(json.loads((second.output / 'memoria_reutilizada.json').read_text())['segmentos'], 1)
 

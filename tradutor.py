@@ -58,6 +58,18 @@ SEMANTIC_RISK_RE = re.compile(
     re.I,
 )
 ENGLISH_RESIDUAL_RE = re.compile(r"\b(the|and|that|with|from|this|which|were|have|into|when|where)\b", re.I)
+ENGLISH_NUMBER_WORDS = {
+    word: str(value)
+    for value, words in enumerate((
+        (), ("one", "first"), ("two", "second"), ("three", "third"), ("four", "fourth"),
+        ("five", "fifth"), ("six", "sixth"), ("seven", "seventh"), ("eight", "eighth"),
+        ("nine", "ninth"), ("ten", "tenth"), ("eleven", "eleventh"), ("twelve", "twelfth"),
+        ("thirteen", "thirteenth"), ("fourteen", "fourteenth"), ("fifteen", "fifteenth"),
+        ("sixteen", "sixteenth"), ("seventeen", "seventeenth"), ("eighteen", "eighteenth"),
+        ("nineteen", "nineteenth"), ("twenty", "twentieth"),
+    ))
+    for word in words
+}
 
 
 @dataclass(frozen=True)
@@ -703,6 +715,7 @@ def protect_epub_nontext(fragment: str, prefix: str) -> tuple[str, dict[str, str
     soup = BeautifulSoup(fragment, "html.parser")
     protected: dict[str, str] = {}
     selected = list(soup.select('img, math, svg, .math, [role="doc-pagebreak"]'))
+    selected += [tag for tag in soup.find_all("a") if not tag.get_text(strip=True) and not tag.find(True)]
     selected = [node for node in selected if not any(parent in selected for parent in node.parents)]
     for index, tag in enumerate(selected, 1):
         token = f"[[[MATH_{prefix}_{index:04d}]]]"
@@ -852,11 +865,21 @@ def local_editorial_validation(paired_items: list[dict]) -> dict:
             })
             select(item_id, "estrutura alterada")
 
-        if numbers(source) != numbers(target):
+        source_numbers = numbers(source)
+        target_numbers = numbers(target)
+        # Escrever "Fourth" como "4" muda a grafia, não o valor.
+        for word in re.findall(r"\b[a-z]+\b", source_plain.casefold()):
+            value = ENGLISH_NUMBER_WORDS.get(word)
+            if value in target_numbers and target_numbers.count(value) > source_numbers.count(value):
+                target_numbers.remove(value)
+        if source_numbers != target_numbers:
             problems.append({
                 "id": item_id, "tipo": "número alterado",
-                "explicacao": "Os valores numéricos da fonte e da tradução não coincidem.",
-                "sugestao": "Restaurar os números da fonte, alterando apenas a pontuação decimal quando necessário.",
+                "explicacao": f"Fonte: {source_numbers}; tradução: {target_numbers}.",
+                "sugestao": (
+                    "A tradução deve conter exatamente os mesmos algarismos da fonte. "
+                    "Não transforme números escritos por extenso em algarismos."
+                ),
             })
             select(item_id, "número alterado")
 
@@ -942,6 +965,16 @@ def translate_editorial_chunks(
         current_size += item_size
     if current:
         chunks.append(current)
+
+    # Keep the working folders representative of the current scope. A shorter
+    # rerun must not leave old source blocks or translated cache files behind.
+    expected_blocks = {f"bloco_{index:03d}.json" for index in range(1, len(chunks) + 1)}
+    for path in source_dir.glob("bloco_*.json"):
+        path.unlink()
+    for path in target_dir.glob("bloco_*.json"):
+        block_name = path.name.replace(".meta.json", ".json")
+        if block_name not in expected_blocks:
+            path.unlink()
 
     initialize_translation_memory(config)
     lock = threading.Lock()
@@ -1065,7 +1098,7 @@ def editorial_audit_key(config: JobConfig, sources: list[Path], targets: list[Pa
         digest.update(path.read_bytes())
     digest.update(config.model.encode("utf-8"))
     digest.update(json.dumps(sorted(selected_ids)).encode("utf-8"))
-    digest.update(b"public-editorial-v3-selective-repair")
+    digest.update(b"public-editorial-v4-number-word-normalization")
     return digest.hexdigest()
 
 
@@ -1308,6 +1341,10 @@ def run_editorial_job(config: JobConfig, log: Callable[[str], None]) -> dict:
     asset_root = config.output / "ativos"
     source_root.mkdir(parents=True, exist_ok=True)
     asset_root.mkdir(parents=True, exist_ok=True)
+    for root in (source_root, asset_root):
+        for stale_file in root.iterdir():
+            if stale_file.is_file():
+                stale_file.unlink()
     documents: list[tuple[str, BeautifulSoup, Tag]] = []
     items: list[dict] = []
     deferred_lists: list[tuple[int, Tag]] = []
@@ -1625,19 +1662,25 @@ def is_chapter_label(label: str) -> bool:
     return bool(re.search(r"(?:^\s*\d+\.\s+\S)|(?:第\s*[一二三四五六七八九十百\d]+\s*章)|(?:\b(?:chapter|capítulo)\s+\d+)", label, re.I))
 
 
-def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
-    entries: list[tuple[str, str]] = []
+def epub_toc_starts(
+    archive: zipfile.ZipFile, opf_name: str, manifest: dict[str, dict[str, str]]
+) -> list[tuple[str, str, int]]:
+    entries: list[tuple[str, str, int]] = []
     ncx_item = next((node for node in manifest.values() if node.get("media-type") == "application/x-dtbncx+xml"), None)
     if ncx_item:
         ncx_name = posixpath.normpath(posixpath.join(posixpath.dirname(opf_name), ncx_item["href"]))
         ncx = ET.fromstring(archive.read(ncx_name))
-        for navpoint in ncx.findall(".//{*}navPoint"):
-            label = "".join(navpoint.findtext("./{*}navLabel/{*}text", default="")).strip()
-            content = navpoint.find("./{*}content")
-            if content is None or not is_chapter_label(label):
-                continue
-            href = urllib.parse.unquote(content.get("src", "").split("#", 1)[0])
-            entries.append((posixpath.normpath(posixpath.join(posixpath.dirname(ncx_name), href)), label))
+        def walk(parent: ET.Element, depth: int) -> None:
+            for navpoint in parent.findall("./{*}navPoint"):
+                label = navpoint.findtext("./{*}navLabel/{*}text", default="").strip()
+                content = navpoint.find("./{*}content")
+                if content is not None:
+                    href = urllib.parse.unquote(content.get("src", "").split("#", 1)[0])
+                    entries.append((posixpath.normpath(posixpath.join(posixpath.dirname(ncx_name), href)), label, depth))
+                walk(navpoint, depth + 1)
+        nav_map = ncx.find(".//{*}navMap")
+        if nav_map is not None:
+            walk(nav_map, 1)
     if entries:
         return entries
     nav_item = next((node for node in manifest.values() if "nav" in node.get("properties", "").split()), None)
@@ -1646,11 +1689,33 @@ def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[
         nav = BeautifulSoup(archive.read(nav_name), "html.parser")
         for link in nav.find_all("a", href=True):
             label = link.get_text(" ", strip=True)
-            if not is_chapter_label(label):
-                continue
             href = urllib.parse.unquote(link["href"].split("#", 1)[0])
-            entries.append((posixpath.normpath(posixpath.join(posixpath.dirname(nav_name), href)), label))
+            entries.append((
+                posixpath.normpath(posixpath.join(posixpath.dirname(nav_name), href)),
+                label,
+                len(link.find_parents("ol")),
+            ))
     return entries
+
+
+def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
+    return [(name, label) for name, label, _ in epub_toc_starts(archive, opf_name, manifest) if is_chapter_label(label)]
+
+
+def chapter_document_slice(
+    ordered_docs: list[str], toc_entries: list[tuple[str, str, int]],
+    chapter_starts: list[tuple[str, str]], count: int,
+) -> set[str]:
+    first_index = ordered_docs.index(chapter_starts[0][0])
+    last_name, last_label = chapter_starts[count - 1]
+    toc_index = next(i for i, entry in enumerate(toc_entries) if entry[:2] == (last_name, last_label))
+    last_depth = toc_entries[toc_index][2]
+    stop_index = len(ordered_docs)
+    for name, _, depth in toc_entries[toc_index + 1:]:
+        if depth <= last_depth and name in ordered_docs and ordered_docs.index(name) > first_index:
+            stop_index = ordered_docs.index(name)
+            break
+    return set(ordered_docs[first_index:stop_index])
 
 
 def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
@@ -1661,6 +1726,10 @@ def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
     asset_root = config.output / "ativos"
     source_root.mkdir(parents=True, exist_ok=True)
     asset_root.mkdir(parents=True, exist_ok=True)
+    for root in (source_root, asset_root):
+        for stale_file in root.iterdir():
+            if stale_file.is_file():
+                stale_file.unlink()
     end_page = config.pages[-1] if config.pages else 0
     documents: list[tuple[str, BeautifulSoup, Tag]] = []
     items: list[dict] = []
@@ -1696,7 +1765,8 @@ def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
         selected_chapter_docs: set[str] = set()
         chapter_titles: list[str] = []
         if config.chapters:
-            chapter_starts = epub_chapter_starts(archive, opf_name, manifest)
+            toc_entries = epub_toc_starts(archive, opf_name, manifest)
+            chapter_starts = [(name, label) for name, label, _ in toc_entries if is_chapter_label(label)]
             if len({name for name, _ in chapter_starts}) != len(chapter_starts):
                 raise ValueError("Capítulos no mesmo XHTML ainda não são suportados; use páginas impressas, se disponíveis.")
             if len(chapter_starts) < config.chapters:
@@ -1705,9 +1775,7 @@ def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
                 posixpath.normpath(posixpath.join(posixpath.dirname(opf_name), manifest[idref]["href"]))
                 for idref in spine if idref in manifest and manifest[idref].get("media-type") in {"application/xhtml+xml", "text/html"}
             ]
-            first_index = ordered_docs.index(chapter_starts[0][0])
-            stop_index = ordered_docs.index(chapter_starts[config.chapters][0]) if len(chapter_starts) > config.chapters else len(ordered_docs)
-            selected_chapter_docs = set(ordered_docs[first_index:stop_index])
+            selected_chapter_docs = chapter_document_slice(ordered_docs, toc_entries, chapter_starts, config.chapters)
             chapter_titles = [title for _, title in chapter_starts[:config.chapters]]
 
         stopped = False

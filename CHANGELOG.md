@@ -1,11 +1,15 @@
 # Histórico
 
-## Não lançado — 2026-09-13
+## Não lançado — 2026-09-14
 
 - Luna passa a ser o modelo padrão econômico; Terra e Sol continuam disponíveis.
 - Memória SQLite reutiliza segmentos estruturalmente válidos entre projetos da biblioteca.
 - Correção dirigida e até duas reauditorias enviam somente os IDs reprovados.
-- Suíte ampliada para 31 testes.
+- Recortes de capítulo agora terminam no próximo item de sumário do mesmo nível ou superior, sem incorporar divisores de partes.
+- Âncoras vazias de navegação do EPUB são protegidas durante a tradução.
+- Validação numérica aceita números escritos em inglês convertidos corretamente em algarismos e mostra os valores divergentes.
+- Reexecuções removem fontes e blocos obsoletos de escopos anteriores das pastas de trabalho.
+- Suíte ampliada para 35 testes.
 - Benchmark privado de 140 elementos congelado por hashes e resultados agregados, sem texto protegido no repositório.
 - Triagem local de números, fórmulas, HTML e glossário antes da auditoria semântica.
 - Auditoria seletiva com payload textual compacto e relatório `validacao_local.json`.

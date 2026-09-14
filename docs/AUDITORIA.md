@@ -2,7 +2,7 @@
 
 Data: 12/09/2026.
 
-Atualização de 14/09/2026: [minilivro autoral](../examples/minilivro/README.md) traduzido pelo motor real, com comparativos e evidência sanitizada. A suíte totaliza 31 testes e agora cobre também memória por segmento e reauditoria restrita aos IDs corrigidos. A amostra documenta uma inconsistência de sigla que uma execução anterior da auditoria automática não detectou e uma limitação de paginação do PDF.
+Atualização de 14/09/2026: [minilivro autoral](../examples/minilivro/README.md) traduzido pelo motor real, com comparativos e evidência sanitizada. A suíte totaliza 35 testes e agora cobre também memória por segmento, reauditoria restrita aos IDs corrigidos, âncoras vazias, números escritos e limites hierárquicos de capítulos. A amostra documenta uma inconsistência de sigla que uma execução anterior da auditoria automática não detectou e uma limitação de paginação do PDF.
 
 ## Escopo
 
@@ -18,11 +18,11 @@ python tradutor.py self-test
 python -m py_compile tradutor.py app.py
 ```
 
-24 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
+35 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
 
 | Contrato | Cobertura |
 | --- | --- |
-| Escopo | Intervalos, capítulos, marcadores, recorte dentro de parágrafo e capítulos compartilhando XHTML |
+| Escopo | Intervalos, capítulos, marcadores, limites hierárquicos no sumário, recorte dentro de parágrafo e capítulos compartilhando XHTML |
 | EPUB parcial | Texto posterior mantido, segundo documento intacto, sumário/CSS/imagem intactos |
 | Objetos | Imagens e matemática protegidas, tabela e legenda conservadas, link de nota preservado |
 | Resposta do modelo | Chaves e estrutura, atributo alterado recusado, placeholder ausente recusado |

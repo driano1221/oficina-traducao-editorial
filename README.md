@@ -149,7 +149,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 31 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. O Luna é o padrão econômico; Sol e Terra continuam selecionáveis. A auditoria semântica recebe apenas trechos selecionados por risco; números, fórmulas, estrutura e expressões inequívocas do glossário são verificados localmente. Problemas encontrados entram numa correção dirigida e numa reauditoria restrita aos IDs alterados. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 35 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. O Luna é o padrão econômico; Sol e Terra continuam selecionáveis. A auditoria semântica recebe apenas trechos selecionados por risco; números, fórmulas, estrutura e expressões inequívocas do glossário são verificados localmente. Problemas encontrados entram numa correção dirigida e numa reauditoria restrita aos IDs alterados. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 
