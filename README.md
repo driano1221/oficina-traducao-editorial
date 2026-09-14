@@ -76,9 +76,10 @@ Equivalente API registrado: **US$ 0,0875 na execução final**; **US$ 0,1791 inc
 - EPUB estruturado: troca o conteúdo dos elementos traduzidos e mantém os demais arquivos do pacote.
 - Preserva imagens e protege fórmulas no fluxo EPUB. Texto dentro de imagens permanece no idioma original.
 - Mantém links, identificadores e atributos dos elementos traduzidos; rejeita respostas que alterem essa estrutura.
-- Usa glossário editável e cache por conteúdo, modelo e instruções.
+- Usa glossário editável, cache do projeto e memória SQLite por segmento aprovado compartilhada pela biblioteca.
 - Separa livros e configurações diferentes em projetos distintos.
 - Gera relatórios de estrutura, validação local e auditoria bilíngue seletiva nos modos editoriais.
+- Corrige apenas os IDs reprovados e reaudita somente esses trechos, em até duas rodadas.
 - Mostra estimativa antes da execução e equivalente API ao final, quando há dados de uso.
 
 ## Escolha o caminho
@@ -116,6 +117,7 @@ A primeira publicação contém código-fonte e instruções de build. Não há 
 
 ```text
 resultados/
+├── memoria_traducao.sqlite3 # segmentos reutilizáveis; fica só no computador
 └── nome_do_livro_identificador/
     ├── LEIA-ME.md
     ├── projeto.json
@@ -125,7 +127,7 @@ resultados/
     └── 04_relatorios/      # QA, manifesto e custo
 ```
 
-Repetir a mesma configuração permite retomar blocos válidos. Mudar o recorte, modelo ou instruções cria outro projeto na interface. Pela CLI, use uma pasta nova ao alterar a configuração.
+Repetir a mesma configuração permite retomar blocos válidos. Depois de um ciclo editorial aprovado, segmentos idênticos também podem ser reaproveitados entre projetos da mesma biblioteca; modelo, instruções ou glossário diferentes geram outra chave. Mudar o recorte, modelo ou instruções cria outro projeto na interface. Pela CLI, use uma pasta nova ao alterar a configuração e passe `--memory-db` para compartilhar a memória.
 
 ## Custo não é fatura
 
@@ -147,7 +149,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 27 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. A auditoria semântica agora recebe apenas trechos selecionados por risco; números, fórmulas, estrutura e expressões inequívocas do glossário são verificados localmente. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 31 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. O Luna é o padrão econômico; Sol e Terra continuam selecionáveis. A auditoria semântica recebe apenas trechos selecionados por risco; números, fórmulas, estrutura e expressões inequívocas do glossário são verificados localmente. Problemas encontrados entram numa correção dirigida e numa reauditoria restrita aos IDs alterados. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 

@@ -134,7 +134,10 @@ def publish_project(project: Path, original_source: Path, config: JobConfig, qa:
         assets = work_dir / name
         if assets.exists():
             shutil.copytree(assets, delivery_dir / name, dirs_exist_ok=True)
-    for name in ("relatorio_qa.json", "validacao_local.json", "auditoria_traducao.json", "manifesto.json", "custo.json", "RELATORIO_VALIDACAO.md"):
+    for name in (
+        "relatorio_qa.json", "validacao_local.json", "auditoria_traducao.json",
+        "memoria_reutilizada.json", "manifesto.json", "custo.json", "RELATORIO_VALIDACAO.md",
+    ):
         source = work_dir / name
         if source.exists():
             shutil.copy2(source, reports_dir / name)
@@ -174,7 +177,7 @@ class TranslatorApp(tk.Tk):
         self.library = tk.StringVar(value=str(APP_ROOT / "resultados"))
         self.scope = tk.StringVar(value="Intervalo de páginas")
         self.amount = tk.StringVar(value="1-40")
-        self.model = tk.StringVar(value="gpt-5.6-sol")
+        self.model = tk.StringVar(value="gpt-5.6-luna")
         self.concurrency = tk.IntVar(value=2)
         self.usd_brl = tk.StringVar(value="5.13")
         self.urls = tk.StringVar()
@@ -398,6 +401,7 @@ class TranslatorApp(tk.Tk):
                 concurrency=max(1, min(4, self.concurrency.get())), instructions=instructions,
                 source_urls=tuple(item.strip() for item in self.urls.get().split(",") if item.strip()),
                 usd_brl=float(self.usd_brl.get().replace(",", ".")),
+                memory_db=Path(self.library.get()).resolve() / "memoria_traducao.sqlite3",
             )
         except Exception as exc:
             messagebox.showerror("Configuração inválida", str(exc))

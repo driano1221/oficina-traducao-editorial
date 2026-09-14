@@ -2,7 +2,7 @@
 
 Data: 12/09/2026.
 
-Atualização de 13/09/2026: [minilivro autoral](../examples/minilivro/README.md) traduzido pelo motor real, com comparativos e evidência sanitizada. Dois testes adicionais verificam hashes e preservação estrutural dos EPUBs publicados; total atual: 22. A amostra documenta também uma inconsistência de sigla que a auditoria automática não detectou e uma limitação de paginação do PDF.
+Atualização de 14/09/2026: [minilivro autoral](../examples/minilivro/README.md) traduzido pelo motor real, com comparativos e evidência sanitizada. A suíte totaliza 31 testes e agora cobre também memória por segmento e reauditoria restrita aos IDs corrigidos. A amostra documenta uma inconsistência de sigla que uma execução anterior da auditoria automática não detectou e uma limitação de paginação do PDF.
 
 ## Escopo
 

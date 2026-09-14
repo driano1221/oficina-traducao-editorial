@@ -46,7 +46,7 @@ Os nomes e links da navegação original do EPUB são mantidos; os rótulos do s
 .\.venv\Scripts\python.exe tradutor.py translate "C:\Livros\exemplo.epub" --chapters 2 --output "C:\Traducoes\exemplo_epub"
 ```
 
-A CLI escreve diretamente em `--output`; as quatro pastas de biblioteca são organizadas pela interface. Não reutilize a pasta para outro arquivo ou configuração. O bloqueio de identidade evita misturar caches, não é um sistema de versionamento nem um bloqueio entre processos: execute um trabalho por pasta de cada vez.
+A CLI escreve diretamente em `--output`; as quatro pastas de biblioteca são organizadas pela interface. Não reutilize a pasta para outro arquivo ou configuração. O bloqueio de identidade evita misturar caches, não é um sistema de versionamento nem um bloqueio entre processos: execute um trabalho por pasta de cada vez. Na interface, `memoria_traducao.sqlite3` fica na raiz da biblioteca e reaproveita segmentos idênticos. Na CLI, use `--memory-db CAMINHO` para obter o mesmo comportamento entre pastas.
 
 ## Custos e privacidade
 
@@ -60,7 +60,7 @@ A tabela local, conferida em 12/09/2026, usa preços por milhão de tokens:
 
 Fontes oficiais: [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol). Os valores podem mudar; não há atualização automática.
 
-O cálculo simples não reproduz descontos, impostos, tarifas de ferramentas, escrita de cache nem sobretaxas por contexto longo. A auditoria envia os pares do recorte juntos e pode ficar grande. Use recortes menores. Confira a fatura no serviço utilizado; login ChatGPT pode consumir franquia/créditos, e não torna o uso gratuito.
+O cálculo simples não reproduz descontos, impostos, tarifas de ferramentas, escrita de cache nem sobretaxas por contexto longo. A auditoria envia somente os pares escolhidos pela triagem de risco; uma correção posterior envia somente os IDs reprovados. Ainda assim, recortes grandes podem consumir bastante contexto. Confira a fatura no serviço utilizado; login ChatGPT pode consumir franquia/créditos, e não torna o uso gratuito.
 
 Os trechos traduzidos, o glossário e as instruções são enviados à OpenAI pelo Codex CLI. Os arquivos de trabalho ficam no computador. O app não tem backend próprio nem pede a sua chave; usa a autenticação existente do CLI. Não publique sua biblioteca, logs ou relatórios sem revisão.
 

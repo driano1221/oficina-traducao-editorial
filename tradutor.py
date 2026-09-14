@@ -10,6 +10,7 @@ import os
 import posixpath
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -19,6 +20,7 @@ import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from contextlib import closing
 from pathlib import Path
 from typing import Callable
 
@@ -63,13 +65,14 @@ class JobConfig:
     pdf: Path
     output: Path
     pages: list[int]
-    model: str = "gpt-5.6-sol"
+    model: str = "gpt-5.6-luna"
     concurrency: int = 2
     instructions: str = DEFAULT_INSTRUCTIONS
     chunk_chars: int = 6500
     source_urls: tuple[str, ...] = ()
     chapters: int = 0
     usd_brl: float = 5.13
+    memory_db: Path | None = None
 
 
 def parse_pages(spec: str, total: int) -> list[int]:
@@ -741,6 +744,16 @@ JSON DE ENTRADA:
 """
 
 
+def valid_editorial_value(item: dict, value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    source_nodes = BeautifulSoup(item["source"], "html.parser").find_all(True)
+    target_nodes = BeautifulSoup(value, "html.parser").find_all(True)
+    if [(node.name, node.attrs) for node in source_nodes] != [(node.name, node.attrs) for node in target_nodes]:
+        return False
+    return all(value.count(token) == 1 for token in item["math"])
+
+
 def parse_editorial_result(path: Path, items: list[dict]) -> dict[str, str] | None:
     if not path.exists():
         return None
@@ -752,17 +765,60 @@ def parse_editorial_result(path: Path, items: list[dict]) -> dict[str, str] | No
     if not isinstance(result, dict) or list(result) != expected:
         return None
     for item in items:
-        value = result.get(item["id"])
-        if not isinstance(value, str) or not value.strip():
+        if not valid_editorial_value(item, result.get(item["id"])):
             return None
-        source_nodes = BeautifulSoup(item["source"], "html.parser").find_all(True)
-        target_nodes = BeautifulSoup(value, "html.parser").find_all(True)
-        if [(n.name, n.attrs) for n in source_nodes] != [(n.name, n.attrs) for n in target_nodes]:
-            return None
-        for token in item["math"]:
-            if value.count(token) != 1:
-                return None
     return result
+
+
+def editorial_memory_key(item: dict, config: JobConfig) -> str:
+    payload = {
+        "source": item["source"], "model": config.model, "instructions": config.instructions,
+        "glossary": load_glossary(), "pipeline": 4,
+    }
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def translation_memory_path(config: JobConfig) -> Path:
+    return config.memory_db or config.output / "memoria_traducao.sqlite3"
+
+
+def initialize_translation_memory(config: JobConfig) -> None:
+    path = translation_memory_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(path, timeout=30)) as database, database:
+        database.execute("PRAGMA journal_mode=WAL")
+        database.execute(
+            "CREATE TABLE IF NOT EXISTS translations ("
+            "memory_key TEXT PRIMARY KEY, translation TEXT NOT NULL, model TEXT NOT NULL, "
+            "created_at TEXT NOT NULL)"
+        )
+
+
+def translation_memory_get(config: JobConfig, items: list[dict]) -> dict[str, str]:
+    initialize_translation_memory(config)
+    keys = {item["id"]: editorial_memory_key(item, config) for item in items}
+    found: dict[str, str] = {}
+    with closing(sqlite3.connect(translation_memory_path(config), timeout=30)) as database:
+        for item in items:
+            row = database.execute(
+                "SELECT translation FROM translations WHERE memory_key = ?", (keys[item["id"]],)
+            ).fetchone()
+            if row and valid_editorial_value(item, row[0]):
+                found[item["id"]] = row[0]
+    return found
+
+
+def translation_memory_put(config: JobConfig, items: list[dict], translations: dict[str, str]) -> None:
+    initialize_translation_memory(config)
+    rows = [
+        (editorial_memory_key(item, config), translations[item["id"]], config.model, time.strftime("%Y-%m-%dT%H:%M:%S"))
+        for item in items
+        if item["id"] in translations and valid_editorial_value(item, translations[item["id"]])
+    ]
+    with closing(sqlite3.connect(translation_memory_path(config), timeout=30)) as database, database:
+        database.executemany(
+            "INSERT OR REPLACE INTO translations(memory_key, translation, model, created_at) VALUES (?, ?, ?, ?)", rows
+        )
 
 
 def local_editorial_validation(paired_items: list[dict]) -> dict:
@@ -887,8 +943,10 @@ def translate_editorial_chunks(
     if current:
         chunks.append(current)
 
+    initialize_translation_memory(config)
     lock = threading.Lock()
     results: dict[str, str] = {}
+    memory_hits: set[str] = set()
 
     def worker(index: int, chunk: list[dict]) -> dict[str, str]:
         source_path = source_dir / f"bloco_{index:03d}.json"
@@ -909,24 +967,49 @@ def translate_editorial_chunks(
             except (OSError, ValueError):
                 meta = {}
             if meta.get("translation_key") == key:
+                trusted = translation_memory_get(config, chunk)
                 with lock:
+                    memory_hits.update(
+                        item_id for item_id, value in trusted.items() if cached.get(item_id) == value
+                    )
                     log(f"Retomada editorial: bloco {index}/{len(chunks)} já validado.")
                 return cached
-        prompt = editorial_prompt(chunk, config.instructions)
+
+        merged = translation_memory_get(config, chunk)
+        pending = [item for item in chunk if item["id"] not in merged]
+        if merged:
+            with lock:
+                memory_hits.update(merged)
+                log(f"Memória editorial: {len(merged)}/{len(chunk)} elementos reaproveitados no bloco {index}.")
+        if not pending:
+            ordered = {item["id"]: merged[item["id"]] for item in chunk}
+            target_path.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
+            record_translation(target_path, key)
+            return ordered
+
+        pending_path = target_dir / f"bloco_{index:03d}.pendente.json"
+        prompt = editorial_prompt(pending, config.instructions)
         last_output = ""
         for attempt in (1, 2):
             with lock:
-                log(f"Traduzindo estrutura {index}/{len(chunks)}, tentativa {attempt}...")
-            code, last_output = run_codex(prompt, config.output, target_path, config.model)
-            parsed = parse_editorial_result(target_path, chunk) if code == 0 else None
+                log(
+                    f"Traduzindo estrutura {index}/{len(chunks)}: {len(pending)} elemento(s) novo(s), "
+                    f"tentativa {attempt}..."
+                )
+            code, last_output = run_codex(prompt, config.output, pending_path, config.model)
+            parsed = parse_editorial_result(pending_path, pending) if code == 0 else None
             if parsed:
+                merged.update(parsed)
+                ordered = {item["id"]: merged[item["id"]] for item in chunk}
+                target_path.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
                 record_translation(target_path, key)
-                return parsed
-            target_path.unlink(missing_ok=True)
-            meta_path(target_path).unlink(missing_ok=True)
+                pending_path.unlink(missing_ok=True)
+                meta_path(pending_path).unlink(missing_ok=True)
+                return ordered
+            pending_path.unlink(missing_ok=True)
+            meta_path(pending_path).unlink(missing_ok=True)
         # Uma unidade sem HTML complexo é mais robusta do que abandonar o livro todo.
-        merged: dict[str, str] = {}
-        for item in chunk:
+        for item in pending:
             single_path = target_dir / f"item_{item['id']}.json"
             parsed = parse_editorial_result(single_path, [item])
             if not parsed:
@@ -936,14 +1019,20 @@ def translate_editorial_chunks(
                 raise RuntimeError(f"Falha ao traduzir o elemento {item['id']}: {last_output[-1000:]}")
             merged.update(parsed)
             single_path.unlink(missing_ok=True)
-        target_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+            meta_path(single_path).unlink(missing_ok=True)
+        ordered = {item["id"]: merged[item["id"]] for item in chunk}
+        target_path.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
         record_translation(target_path, key)
-        return merged
+        return ordered
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=config.concurrency) as pool:
         futures = [pool.submit(worker, i, chunk) for i, chunk in enumerate(chunks, 1)]
         for future in concurrent.futures.as_completed(futures):
             results.update(future.result())
+    (config.output / "memoria_reutilizada.json").write_text(
+        json.dumps({"ids": sorted(memory_hits), "segmentos": len(memory_hits)}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     return results
 
 
@@ -970,7 +1059,20 @@ def print_html_to_pdf(html_path: Path, pdf_path: Path) -> None:
         raise RuntimeError(f"Falha ao compor PDF no navegador: {(completed.stderr or completed.stdout)[-1200:]}")
 
 
-def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -> dict:
+def editorial_audit_key(config: JobConfig, sources: list[Path], targets: list[Path], selected_ids: set[str]) -> str:
+    digest = hashlib.sha256()
+    for path in sources + targets:
+        digest.update(path.read_bytes())
+    digest.update(config.model.encode("utf-8"))
+    digest.update(json.dumps(sorted(selected_ids)).encode("utf-8"))
+    digest.update(b"public-editorial-v3-selective-repair")
+    return digest.hexdigest()
+
+
+def audit_editorial_translation(
+    config: JobConfig, log: Callable[[str], None], force_ids: set[str] | None = None,
+    audit_path: Path | None = None,
+) -> dict:
     sources = sorted((config.output / "fontes_editoriais").glob("bloco_*.json"))
     targets = sorted(
         path for path in (config.output / "traduzidos_editoriais").glob("bloco_*.json")
@@ -986,10 +1088,38 @@ def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -
             corrected = target_data.get(item_id, "")
             paired_items.append({"id": item_id, "fonte": source_text, "traducao": corrected})
     local = local_editorial_validation(paired_items)
-    local_path = config.output / "validacao_local.json"
+    audit_path = audit_path or config.output / "auditoria_traducao.json"
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    local_path = (
+        config.output / "validacao_local.json" if force_ids is None
+        else audit_path.with_name(f"{audit_path.stem}_validacao_local.json")
+    )
     local_path.write_text(json.dumps(local, ensure_ascii=False, indent=2), encoding="utf-8")
-    selected_ids = set(local["itens_para_auditoria_semantica"])
+    reused_ids: set[str] = set()
+    if force_ids is None:
+        try:
+            reuse_report = json.loads((config.output / "memoria_reutilizada.json").read_text(encoding="utf-8"))
+            reported_ids = set(reuse_report.get("ids", []))
+            memory_items = [{
+                "id": item["id"], "source": item["fonte"],
+                "math": {token: "" for token in re.findall(r"\[\[\[MATH_[^]]+\]\]\]", item["fonte"])},
+            } for item in paired_items if item["id"] in reported_ids]
+            trusted = translation_memory_get(config, memory_items)
+            reused_ids = {
+                item["id"] for item in paired_items
+                if item["id"] in trusted and trusted[item["id"]] == item["traducao"]
+            }
+        except (OSError, ValueError):
+            pass
+        blocking_ids = {problem.get("id") for problem in local["problemas"]}
+        selected_ids = (set(local["itens_para_auditoria_semantica"]) - reused_ids) | blocking_ids
+    else:
+        selected_ids = set(force_ids)
     audited_items = [item for item in paired_items if item["id"] in selected_ids]
+    local_problems = [
+        problem for problem in local["problemas"]
+        if force_ids is None or problem.get("id") in selected_ids
+    ]
     audit_payload = [{
         "id": item["id"],
         "fonte": BeautifulSoup(item["fonte"], "html.parser").get_text(" ", strip=True),
@@ -1000,13 +1130,7 @@ def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -
         "encaminhados à auditoria semântica."
     )
 
-    audit_path = config.output / "auditoria_traducao.json"
-    digest = hashlib.sha256()
-    for path in sources + targets:
-        digest.update(path.read_bytes())
-    digest.update(config.model.encode("utf-8"))
-    digest.update(b"public-editorial-v2-selective")
-    key = digest.hexdigest()
+    key = editorial_audit_key(config, sources, targets, selected_ids)
     if audit_path.exists():
         try:
             cached = json.loads(audit_path.read_text(encoding="utf-8"))
@@ -1019,9 +1143,11 @@ def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -
 
     if not audited_items:
         audit = {
-            "status": local["status"], "metodo": "triagem_local_sem_chamada_de_modelo",
+            "status": "revisar" if local_problems else "aprovado",
+            "metodo": "triagem_local_sem_chamada_de_modelo",
             "pares_totais": len(paired_items), "pares_revisados": 0,
-            "pares_liberados_localmente": len(paired_items), "problemas": local["problemas"],
+            "pares_liberados_localmente": len(paired_items), "problemas": local_problems,
+            "pares_reutilizados_memoria": len(reused_ids),
         }
         audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
         record_translation(audit_path, key)
@@ -1060,14 +1186,120 @@ PARES FONTE/TRADUÇÃO:
             "explicacao": f"O revisor declarou {audit.get('pares_revisados')} de {len(audited_items)} pares selecionados.",
             "sugestao": "Executar novamente a auditoria completa.",
         })
-    audit["problemas"] = local["problemas"] + audit["problemas"]
+    audit["problemas"] = local_problems + audit["problemas"]
     audit["status"] = "revisar" if audit["problemas"] else "aprovado"
     audit["metodo"] = "triagem_local_e_auditoria_semantica_seletiva"
     audit["pares_totais"] = len(paired_items)
     audit["pares_liberados_localmente"] = len(paired_items) - len(audited_items)
+    audit["pares_reutilizados_memoria"] = len(reused_ids)
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
     record_translation(audit_path, key)
     return audit
+
+
+def repair_editorial_translation(
+    config: JobConfig, items: list[dict], translated: dict[str, str], audit: dict,
+    log: Callable[[str], None], round_index: int,
+) -> set[str]:
+    by_id = {item["id"]: item for item in items}
+    problems = [
+        problem for problem in audit.get("problemas", [])
+        if isinstance(problem, dict) and problem.get("id") in by_id
+    ]
+    affected = [by_id[item_id] for item_id in dict.fromkeys(problem["id"] for problem in problems)]
+    if not affected:
+        return set()
+
+    revision_dir = config.output / "revisoes"
+    revision_dir.mkdir(parents=True, exist_ok=True)
+    output_path = revision_dir / f"correcao_{round_index:02d}.json"
+    payload = [{
+        "id": item["id"], "fonte": item["source"], "traducao_atual": translated[item["id"]],
+        "problemas": [problem for problem in problems if problem["id"] == item["id"]],
+    } for item in affected]
+    prompt = f"""Corrija somente as traduções apontadas pela auditoria editorial.
+Devolva SOMENTE um objeto JSON válido, com exatamente os IDs abaixo e na mesma ordem.
+Preserve literalmente tags HTML e seus atributos, números e tokens [[[MATH_...]]].
+Não altere conteúdo que não seja necessário para resolver os problemas descritos.
+Use português brasileiro acadêmico, natural, completo e fiel à fonte.
+
+GLOSSÁRIO CANÔNICO:
+{json.dumps(load_glossary(), ensure_ascii=False)}
+
+ITENS A CORRIGIR:
+{json.dumps(payload, ensure_ascii=False)}
+"""
+    log(f"Correção dirigida {round_index}: {len(affected)} elemento(s), sem reenviar o restante do livro.")
+    code, output = run_codex(prompt, config.output, output_path, config.model)
+    repaired = parse_editorial_result(output_path, affected) if code == 0 else None
+    if not repaired:
+        log(f"Correção dirigida {round_index} inválida; tradução anterior foi preservada. {output[-300:]}")
+        return set()
+
+    translated.update(repaired)
+    for target_path in sorted((config.output / "traduzidos_editoriais").glob("bloco_*.json")):
+        if target_path.name.endswith((".meta.json", ".usage.json")):
+            continue
+        target_data = json.loads(target_path.read_text(encoding="utf-8"))
+        changed = set(target_data) & set(repaired)
+        if changed:
+            target_data.update({item_id: repaired[item_id] for item_id in changed})
+            target_path.write_text(json.dumps(target_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return set(repaired)
+
+
+def run_editorial_quality_loop(
+    config: JobConfig, items: list[dict], translated: dict[str, str], log: Callable[[str], None]
+) -> dict:
+    audit = audit_editorial_translation(config, log)
+    initial_audit = dict(audit)
+    passes = [{"etapa": "auditoria_inicial", "status": audit.get("status"),
+               "problemas": len(audit.get("problemas", []))}]
+    if audit.get("status") == "revisar":
+        revision_dir = config.output / "revisoes"
+        revision_dir.mkdir(parents=True, exist_ok=True)
+        (revision_dir / "auditoria_inicial.json").write_text(
+            json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    for round_index in (1, 2):
+        if audit.get("status") == "aprovado":
+            break
+        repaired_ids = repair_editorial_translation(config, items, translated, audit, log, round_index)
+        if not repaired_ids:
+            break
+        audit = audit_editorial_translation(
+            config, log, force_ids=repaired_ids,
+            audit_path=config.output / "revisoes" / f"auditoria_correcao_{round_index:02d}.json",
+        )
+        passes.append({"etapa": f"correcao_{round_index:02d}", "ids": sorted(repaired_ids),
+                       "status": audit.get("status"), "problemas": len(audit.get("problemas", []))})
+
+    final = dict(audit)
+    final["pares_revisados"] = initial_audit.get("pares_revisados", final.get("pares_revisados", 0))
+    final["pares_liberados_localmente"] = initial_audit.get(
+        "pares_liberados_localmente", final.get("pares_liberados_localmente", 0)
+    )
+    final["ciclo_qualidade"] = passes
+    final_path = config.output / "auditoria_traducao.json"
+    final_path.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
+    sources = sorted((config.output / "fontes_editoriais").glob("bloco_*.json"))
+    targets = sorted(
+        path for path in (config.output / "traduzidos_editoriais").glob("bloco_*.json")
+        if not path.name.endswith((".meta.json", ".usage.json"))
+    )
+    paired = []
+    for source_path, target_path in zip(sources, targets):
+        source_data = json.loads(source_path.read_text(encoding="utf-8"))
+        target_data = json.loads(target_path.read_text(encoding="utf-8"))
+        paired.extend({"id": item_id, "fonte": value, "traducao": target_data.get(item_id, "")}
+                      for item_id, value in source_data.items())
+    selected = set(local_editorial_validation(paired)["itens_para_auditoria_semantica"])
+    record_translation(final_path, editorial_audit_key(config, sources, targets, selected))
+    if final.get("status") == "aprovado":
+        translation_memory_put(config, items, translated)
+        final["memoria_traducao"] = {"status": "atualizada", "segmentos": len(items)}
+        final_path.write_text(json.dumps(final, ensure_ascii=False, indent=2), encoding="utf-8")
+    return final
 
 
 def run_editorial_job(config: JobConfig, log: Callable[[str], None]) -> dict:
@@ -1153,7 +1385,7 @@ def run_editorial_job(config: JobConfig, log: Callable[[str], None]) -> dict:
         f"{source_counts['figuras']} figuras."
     )
     translated = translate_editorial_chunks(config, items, log)
-    semantic_audit = audit_editorial_translation(config, log)
+    semantic_audit = run_editorial_quality_loop(config, items, translated, log)
     for item in items:
         corrected = translated[item["id"]]
         restored = restore_math(corrected, item["math"])
@@ -1552,7 +1784,7 @@ def run_epub_job(config: JobConfig, log: Callable[[str], None]) -> dict:
         f"{source_counts['equacoes']} blocos de equação e {source_counts['tabelas']} tabelas."
     )
     translated = translate_editorial_chunks(config, items, log)
-    semantic_audit = audit_editorial_translation(config, log)
+    semantic_audit = run_editorial_quality_loop(config, items, translated, log)
     for item in items:
         corrected = translated[item["id"]]
         restored = restore_math(corrected, item["math"])
@@ -1712,10 +1944,11 @@ def main() -> None:
     run.add_argument("--pages", default="1-42")
     run.add_argument("--chapters", type=int, default=0, help="Primeiros N capítulos reais do EPUB, conforme o sumário")
     run.add_argument("--output", type=Path, required=True)
-    run.add_argument("--model", default="gpt-5.6-sol")
+    run.add_argument("--model", default="gpt-5.6-luna")
     run.add_argument("--concurrency", type=int, default=2)
     run.add_argument("--usd-brl", type=float, default=5.13, help="Câmbio usado apenas para exibir o custo equivalente em reais")
     run.add_argument("--source-url", action="append", default=[], help="HTML oficial estruturado; repita para cada seção")
+    run.add_argument("--memory-db", type=Path, help="Memória SQLite compartilhada entre projetos")
     sub.add_parser("self-test")
     args = parser.parse_args()
     if args.command == "self-test":
@@ -1729,6 +1962,7 @@ def main() -> None:
             pdf=pdf, output=args.output.resolve(), pages=pages, model=args.model,
             concurrency=max(1, min(4, args.concurrency)), source_urls=tuple(args.source_url),
             chapters=max(0, args.chapters), usd_brl=max(0.01, args.usd_brl),
+            memory_db=args.memory_db.resolve() if args.memory_db else None,
         )
         qa = run_job(config)
         print(json.dumps(qa, ensure_ascii=False, indent=2))

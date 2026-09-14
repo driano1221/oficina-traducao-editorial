@@ -176,6 +176,88 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(audit['pares_revisados'], 1)
         self.assertTrue((config.output / 'validacao_local.json').exists())
 
+    def test_segment_memory_avoids_retranslating_same_content(self):
+        memory = self.root / 'library' / 'memory.sqlite3'
+        item = {'id': 'p1', 'source': '<strong>A causal effect</strong>.', 'math': {}, 'tags': ['strong']}
+        first = engine.JobConfig(self.source, self.root / 'first', [1], memory_db=memory)
+        second = engine.JobConfig(self.source, self.root / 'second', [1], memory_db=memory)
+
+        def translate(prompt, cwd, output, model):
+            output.write_text(json.dumps({'p1': '<strong>Um efeito causal</strong>.'}), encoding='utf-8')
+            return 0, ''
+
+        with patch.object(engine, 'run_codex', side_effect=translate) as run:
+            result_first = engine.translate_editorial_chunks(first, [item], lambda _: None)
+            engine.translation_memory_put(first, [item], result_first)
+            result_second = engine.translate_editorial_chunks(second, [item], lambda _: None)
+        self.assertEqual(result_first, result_second)
+        self.assertEqual(run.call_count, 1)
+        self.assertTrue(memory.exists())
+        self.assertEqual(json.loads((second.output / 'memoria_reutilizada.json').read_text())['segmentos'], 1)
+
+    def test_approved_memory_hit_skips_semantic_reaudit(self):
+        config = self.config()
+        source_dir = config.output / 'fontes_editoriais'
+        target_dir = config.output / 'traduzidos_editoriais'
+        source_dir.mkdir(parents=True)
+        target_dir.mkdir()
+        source = {'long': 'Impact and causal effect. ' * 40}
+        target = {'long': 'Impacto e efeito causal. ' * 40}
+        (source_dir / 'bloco_001.json').write_text(json.dumps(source), encoding='utf-8')
+        (target_dir / 'bloco_001.json').write_text(json.dumps(target), encoding='utf-8')
+        engine.translation_memory_put(
+            config, [{'id': 'long', 'source': source['long'], 'math': {}}], target
+        )
+        (config.output / 'memoria_reutilizada.json').write_text(json.dumps({'ids': ['long']}), encoding='utf-8')
+
+        with patch.object(engine, 'run_codex') as run:
+            audit = engine.audit_editorial_translation(config, lambda _: None)
+        run.assert_not_called()
+        self.assertEqual(audit['status'], 'aprovado')
+        self.assertEqual(audit['pares_reutilizados_memoria'], 1)
+
+    def test_quality_loop_reaudits_only_repaired_ids(self):
+        config = self.config()
+        config.output.mkdir()
+        items = [
+            {'id': 'bad', 'source': 'The effect is not zero.', 'math': {}, 'tags': []},
+            {'id': 'good', 'source': 'Introduction', 'math': {}, 'tags': []},
+        ]
+        translated = {'bad': 'O efeito é zero.', 'good': 'Introdução'}
+        initial = {'status': 'revisar', 'problemas': [{'id': 'bad', 'tipo': 'negação'}]}
+        approved = {'status': 'aprovado', 'problemas': [], 'pares_revisados': 1}
+
+        with patch.object(engine, 'audit_editorial_translation', side_effect=[initial, approved]) as audit, \
+                patch.object(engine, 'repair_editorial_translation', return_value={'bad'}):
+            final = engine.run_editorial_quality_loop(config, items, translated, lambda _: None)
+        self.assertEqual(final['status'], 'aprovado')
+        self.assertEqual(audit.call_count, 2)
+        self.assertEqual(audit.call_args_list[1].kwargs['force_ids'], {'bad'})
+
+    def test_directed_repair_changes_only_failed_segment(self):
+        config = self.config()
+        target_dir = config.output / 'traduzidos_editoriais'
+        target_dir.mkdir(parents=True)
+        current = {'bad': 'O efeito é zero.', 'good': 'Introdução'}
+        (target_dir / 'bloco_001.json').write_text(json.dumps(current), encoding='utf-8')
+        items = [
+            {'id': 'bad', 'source': 'The effect is not zero.', 'math': {}, 'tags': []},
+            {'id': 'good', 'source': 'Introduction', 'math': {}, 'tags': []},
+        ]
+        audit = {'status': 'revisar', 'problemas': [{'id': 'bad', 'tipo': 'negação'}]}
+
+        def repair(prompt, cwd, output, model):
+            self.assertIn('"id": "bad"', prompt)
+            self.assertNotIn('"id": "good"', prompt)
+            output.write_text(json.dumps({'bad': 'O efeito não é zero.'}), encoding='utf-8')
+            return 0, ''
+
+        with patch.object(engine, 'run_codex', side_effect=repair):
+            repaired = engine.repair_editorial_translation(config, items, current, audit, lambda _: None, 1)
+        saved = json.loads((target_dir / 'bloco_001.json').read_text(encoding='utf-8'))
+        self.assertEqual(repaired, {'bad'})
+        self.assertEqual(saved, {'bad': 'O efeito não é zero.', 'good': 'Introdução'})
+
     def test_partial_epub_keeps_original_remainder_and_assets(self):
         config = self.config()
         qa = self.run_epub(config)

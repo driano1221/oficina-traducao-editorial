@@ -28,7 +28,7 @@ O Codex CLI recebe texto por stdin, gera resposta final em arquivo e informa eve
 
 A implementação usa [execução não interativa documentada](https://developers.openai.com/codex/noninteractive). O CLI e suas permissões devem estar configurados pelo usuário.
 
-As chaves de cache incluem conteúdo, modelo, instruções e glossário. Um manifesto de identidade bloqueia reutilização de pasta com outra configuração. No fluxo EPUB/HTML, existe tentativa por bloco e fallback por elemento.
+As chaves de cache incluem conteúdo, modelo, instruções e glossário. Um manifesto de identidade bloqueia reutilização de pasta com outra configuração. No fluxo EPUB/HTML, existe tentativa por bloco e fallback por elemento. A interface mantém ainda uma memória SQLite por segmento na raiz da biblioteca: somente correspondências exatas de ciclos aprovados e estruturalmente válidas são reutilizadas.
 
 A interface captura os campos antes de iniciar a thread de trabalho. Alterações posteriores na tela não mudam a tarefa já iniciada.
 
@@ -42,4 +42,4 @@ Contagem igual de figuras não prova que a figura está legível, e um parecer d
 
 ## Pontos ainda experimentais
 
-A composição HTML/PDF aplica estilo editorial próprio. Fontes e URLs de CSS nem sempre são portáveis para HTML independente. Notas laterais do HTML seguem convenções específicas; não há extrator universal de notas. A auditoria semântica ainda não é particionada para livros grandes. Não há testes universais de OCR, bidirecionalidade ou todas as variantes de EPUB.
+A composição HTML/PDF aplica estilo editorial próprio. Fontes e URLs de CSS nem sempre são portáveis para HTML independente. Notas laterais do HTML seguem convenções específicas; não há extrator universal de notas. A triagem reduz a auditoria semântica, mas um livro grande ainda pode produzir muitos trechos de risco. Correções são limitadas a duas rodadas automáticas e podem continuar exigindo revisão humana. Não há testes universais de OCR, bidirecionalidade ou todas as variantes de EPUB.
