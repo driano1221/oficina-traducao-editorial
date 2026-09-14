@@ -49,6 +49,14 @@ MODEL_PRICING_USD_PER_MILLION = {
     "gpt-5.6-luna": {"input": 0.20, "cached_input": 0.02, "output": 1.20},
 }
 
+SEMANTIC_AUDIT_MIN_CHARS = 800
+SEMANTIC_RISK_RE = re.compile(
+    r"\b(not|no|without|unless|except|only|rather|respectively|conditional|independent|"
+    r"increase|decrease|cause|causal|effect|impact|bias|probability|significant)\b",
+    re.I,
+)
+ENGLISH_RESIDUAL_RE = re.compile(r"\b(the|and|that|with|from|this|which|were|have|into|when|where)\b", re.I)
+
 
 @dataclass(frozen=True)
 class JobConfig:
@@ -757,6 +765,107 @@ def parse_editorial_result(path: Path, items: list[dict]) -> dict[str, str] | No
     return result
 
 
+def local_editorial_validation(paired_items: list[dict]) -> dict:
+    """Triagem conservadora e gratuita antes da revisão semântica por modelo."""
+    glossary = load_glossary()
+    selected: dict[str, list[str]] = {}
+    problems: list[dict[str, str]] = []
+
+    def select(item_id: str, reason: str) -> None:
+        selected.setdefault(item_id, []).append(reason)
+
+    def numbers(value: str) -> list[str]:
+        plain = BeautifulSoup(value, "html.parser").get_text(" ", strip=True)
+        tokens = re.findall(r"\d+(?:[.,]\d+)*%?", plain)
+        return sorted(re.sub(r"\D", "", token) + ("%" if token.endswith("%") else "") for token in tokens)
+
+    for item in paired_items:
+        item_id = item["id"]
+        source = item["fonte"]
+        target = item["traducao"]
+        source_plain = BeautifulSoup(source, "html.parser").get_text(" ", strip=True)
+        target_plain = BeautifulSoup(target, "html.parser").get_text(" ", strip=True)
+
+        source_nodes = BeautifulSoup(source, "html.parser").find_all(True)
+        target_nodes = BeautifulSoup(target, "html.parser").find_all(True)
+        if [(node.name, node.attrs) for node in source_nodes] != [(node.name, node.attrs) for node in target_nodes]:
+            problems.append({
+                "id": item_id, "tipo": "estrutura alterada",
+                "explicacao": "As tags ou os atributos HTML da tradução diferem da fonte.",
+                "sugestao": "Restaurar integralmente a estrutura HTML da fonte.",
+            })
+            select(item_id, "estrutura alterada")
+
+        if numbers(source) != numbers(target):
+            problems.append({
+                "id": item_id, "tipo": "número alterado",
+                "explicacao": "Os valores numéricos da fonte e da tradução não coincidem.",
+                "sugestao": "Restaurar os números da fonte, alterando apenas a pontuação decimal quando necessário.",
+            })
+            select(item_id, "número alterado")
+
+        source_math = sorted(re.findall(r"\[\[\[MATH_[^]]+\]\]\]", source))
+        target_math = sorted(re.findall(r"\[\[\[MATH_[^]]+\]\]\]", target))
+        if source_math != target_math:
+            problems.append({
+                "id": item_id, "tipo": "fórmula alterada",
+                "explicacao": "Os marcadores de fórmulas da fonte e da tradução não coincidem.",
+                "sugestao": "Preservar literalmente todos os marcadores [[[MATH_...]]].",
+            })
+            select(item_id, "fórmula alterada")
+
+        source_folded = source_plain.casefold()
+        target_folded = target_plain.casefold()
+        for term, canonical in glossary.items():
+            # Termos isolados podem ser polissêmicos; só expressões inequívocas são bloqueadas por código.
+            if " " not in term.strip():
+                continue
+            if term.casefold() in source_folded and canonical.casefold() not in target_folded:
+                problems.append({
+                    "id": item_id, "tipo": "glossário não aplicado",
+                    "explicacao": f'O termo “{term}” não usa a tradução canônica “{canonical}”.',
+                    "sugestao": f'Usar “{canonical}” neste contexto.',
+                })
+                select(item_id, "glossário não aplicado")
+
+        length = len(source_plain)
+        if length >= SEMANTIC_AUDIT_MIN_CHARS:
+            select(item_id, "parágrafo longo")
+        elif re.search(r"[\u3400-\u9fff]", source_plain) and length >= 400:
+            select(item_id, "texto CJK denso")
+        elif length >= 250 and SEMANTIC_RISK_RE.search(source_plain):
+            select(item_id, "relação semântica sensível")
+        if len(ENGLISH_RESIDUAL_RE.findall(target_plain)) >= 3:
+            select(item_id, "possível resíduo em inglês")
+
+        ratio = len(target_plain) / max(1, length)
+        low, high = ((0.4, 4.0) if re.search(r"[\u3400-\u9fff]", source_plain) else (0.55, 1.8))
+        if not low <= ratio <= high:
+            select(item_id, "comprimento atípico")
+
+    selected_items = [item for item in paired_items if item["id"] in selected]
+    compact_items = [{
+        "id": item["id"],
+        "fonte": BeautifulSoup(item["fonte"], "html.parser").get_text(" ", strip=True),
+        "traducao": BeautifulSoup(item["traducao"], "html.parser").get_text(" ", strip=True),
+    } for item in selected_items]
+    raw_size = len(json.dumps(paired_items, ensure_ascii=False))
+    compact_size = len(json.dumps(compact_items, ensure_ascii=False))
+    return {
+        "status": "revisar" if problems else "aprovado",
+        "pares_verificados": len(paired_items),
+        "pares_para_auditoria_semantica": len(selected),
+        "itens_para_auditoria_semantica": list(selected),
+        "motivos_selecao": selected,
+        "problemas": problems,
+        "estimativa_payload": {
+            "caracteres_sem_triagem": raw_size,
+            "caracteres_apos_triagem": compact_size,
+            "reducao_percentual": round(100 * (1 - compact_size / max(1, raw_size)), 1),
+        },
+    }
+
+
 def translate_editorial_chunks(
     config: JobConfig, items: list[dict], log: Callable[[str], None]
 ) -> dict[str, str]:
@@ -869,22 +978,6 @@ def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -
     )
     if not sources or len(sources) != len(targets):
         return {"status": "revisar", "problemas": ["Pares de auditoria incompletos."]}
-    audit_path = config.output / "auditoria_traducao.json"
-    digest = hashlib.sha256()
-    for path in sources + targets:
-        digest.update(path.read_bytes())
-    digest.update(config.model.encode("utf-8"))
-    digest.update(b"public-editorial-v1")
-    key = digest.hexdigest()
-    if audit_path.exists():
-        try:
-            cached = json.loads(audit_path.read_text(encoding="utf-8"))
-            meta = json.loads(meta_path(audit_path).read_text(encoding="utf-8"))
-            if meta.get("translation_key") == key and cached.get("status") in {"aprovado", "revisar"}:
-                log("Retomada: auditoria semântica já estava válida.")
-                return cached
-        except (OSError, ValueError):
-            pass
     paired_items = []
     for source_path, target_path in zip(sources, targets):
         source_data = json.loads(source_path.read_text(encoding="utf-8"))
@@ -892,9 +985,51 @@ def audit_editorial_translation(config: JobConfig, log: Callable[[str], None]) -
         for item_id, source_text in source_data.items():
             corrected = target_data.get(item_id, "")
             paired_items.append({"id": item_id, "fonte": source_text, "traducao": corrected})
+    local = local_editorial_validation(paired_items)
+    local_path = config.output / "validacao_local.json"
+    local_path.write_text(json.dumps(local, ensure_ascii=False, indent=2), encoding="utf-8")
+    selected_ids = set(local["itens_para_auditoria_semantica"])
+    audited_items = [item for item in paired_items if item["id"] in selected_ids]
+    audit_payload = [{
+        "id": item["id"],
+        "fonte": BeautifulSoup(item["fonte"], "html.parser").get_text(" ", strip=True),
+        "traducao": BeautifulSoup(item["traducao"], "html.parser").get_text(" ", strip=True),
+    } for item in audited_items]
+    log(
+        f"Triagem local: {len(audited_items)}/{len(paired_items)} elementos "
+        "encaminhados à auditoria semântica."
+    )
+
+    audit_path = config.output / "auditoria_traducao.json"
+    digest = hashlib.sha256()
+    for path in sources + targets:
+        digest.update(path.read_bytes())
+    digest.update(config.model.encode("utf-8"))
+    digest.update(b"public-editorial-v2-selective")
+    key = digest.hexdigest()
+    if audit_path.exists():
+        try:
+            cached = json.loads(audit_path.read_text(encoding="utf-8"))
+            meta = json.loads(meta_path(audit_path).read_text(encoding="utf-8"))
+            if meta.get("translation_key") == key and cached.get("status") in {"aprovado", "revisar"}:
+                log("Retomada: auditoria semântica seletiva já estava válida.")
+                return cached
+        except (OSError, ValueError):
+            pass
+
+    if not audited_items:
+        audit = {
+            "status": local["status"], "metodo": "triagem_local_sem_chamada_de_modelo",
+            "pares_totais": len(paired_items), "pares_revisados": 0,
+            "pares_liberados_localmente": len(paired_items), "problemas": local["problemas"],
+        }
+        audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+        record_translation(audit_path, key)
+        return audit
     prompt = f"""Atue como revisor bilíngue sênior de um livro técnico ou acadêmico. A fonte pode
 estar em inglês, chinês ou ambos, e a tradução deve estar em português brasileiro.
-Compare TODOS os pares fornecidos abaixo. Não use ferramentas nem tente abrir arquivos. Os
+Compare TODOS os pares selecionados abaixo. Os demais já passaram por verificações locais e
+foram excluídos desta chamada para economizar tokens. Não use ferramentas nem tente abrir arquivos. Os
 tokens [[[MATH_...]]] representam fórmulas idênticas e não são erros.
 
 Procure somente problemas substantivos: omissão/acréscimo, inversão de sentido, negação,
@@ -908,9 +1043,9 @@ Use status aprovado se não houver problema substantivo. Conte todos os pares ef
 comparados. Liste no máximo 20 problemas, em ordem de gravidade.
 
 PARES FONTE/TRADUÇÃO:
-{json.dumps(paired_items, ensure_ascii=False)}
+{json.dumps(audit_payload, ensure_ascii=False)}
 """
-    log("Executando auditoria semântica bilíngue...")
+    log("Executando auditoria semântica bilíngue seletiva...")
     code, output = run_codex(prompt, config.output, audit_path, config.model)
     try:
         audit = json.loads(strip_json_fence(audit_path.read_text(encoding="utf-8"))) if code == 0 else None
@@ -918,13 +1053,18 @@ PARES FONTE/TRADUÇÃO:
         audit = None
     if not isinstance(audit, dict) or audit.get("status") not in {"aprovado", "revisar"} or not isinstance(audit.get("problemas"), list):
         return {"status": "revisar", "problemas": [f"Auditoria automática inválida: {output[-500:]}"]}
-    if audit.get("pares_revisados") != len(paired_items):
+    if audit.get("pares_revisados") != len(audited_items):
         audit["status"] = "revisar"
         audit["problemas"].append({
             "id": "auditoria", "tipo": "cobertura incompleta",
-            "explicacao": f"O revisor declarou {audit.get('pares_revisados')} de {len(paired_items)} pares.",
+            "explicacao": f"O revisor declarou {audit.get('pares_revisados')} de {len(audited_items)} pares selecionados.",
             "sugestao": "Executar novamente a auditoria completa.",
         })
+    audit["problemas"] = local["problemas"] + audit["problemas"]
+    audit["status"] = "revisar" if audit["problemas"] else "aprovado"
+    audit["metodo"] = "triagem_local_e_auditoria_semantica_seletiva"
+    audit["pares_totais"] = len(paired_items)
+    audit["pares_liberados_localmente"] = len(paired_items) - len(audited_items)
     audit_path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
     record_translation(audit_path, key)
     return audit

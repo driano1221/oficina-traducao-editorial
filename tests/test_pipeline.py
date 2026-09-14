@@ -134,6 +134,48 @@ class PipelineTests(unittest.TestCase):
         path.write_text('{"i":"Formula removida"}', encoding='utf-8')
         self.assertIsNone(engine.parse_editorial_result(path, [item]))
 
+    def test_local_validation_blocks_numbers_and_glossary(self):
+        report = engine.local_editorial_validation([
+            {'id': 'number', 'fonte': 'The estimate is 2.01%.', 'traducao': 'A estimativa é 2,10%.'},
+            {'id': 'term', 'fonte': 'Machine learning is useful.', 'traducao': 'Aprendizagem computacional é útil.'},
+        ])
+        self.assertEqual(report['status'], 'revisar')
+        self.assertEqual({problem['tipo'] for problem in report['problemas']}, {'número alterado', 'glossário não aplicado'})
+        self.assertEqual(set(report['itens_para_auditoria_semantica']), {'number', 'term'})
+
+    def test_local_validation_sends_only_risky_prose_to_semantic_audit(self):
+        report = engine.local_editorial_validation([
+            {'id': 'heading', 'fonte': 'Introduction', 'traducao': 'Introdução'},
+            {'id': 'long', 'fonte': 'Impact and causal effect. ' * 40, 'traducao': 'Impacto e efeito causal. ' * 40},
+        ])
+        self.assertNotIn('heading', report['itens_para_auditoria_semantica'])
+        self.assertIn('long', report['itens_para_auditoria_semantica'])
+
+    def test_semantic_audit_receives_only_locally_selected_pairs(self):
+        config = self.config()
+        source_dir = config.output / 'fontes_editoriais'
+        target_dir = config.output / 'traduzidos_editoriais'
+        source_dir.mkdir(parents=True)
+        target_dir.mkdir()
+        source = {'heading': 'Introduction', 'long': 'Impact and causal effect. ' * 40}
+        target = {'heading': 'Introdução', 'long': 'Impacto e efeito causal. ' * 40}
+        (source_dir / 'bloco_001.json').write_text(json.dumps(source), encoding='utf-8')
+        (target_dir / 'bloco_001.json').write_text(json.dumps(target), encoding='utf-8')
+
+        def review(prompt, cwd, output, model):
+            self.assertNotIn('"id": "heading"', prompt)
+            self.assertIn('"id": "long"', prompt)
+            output.write_text(json.dumps({'status': 'aprovado', 'pares_revisados': 1, 'problemas': []}), encoding='utf-8')
+            return 0, ''
+
+        with patch.object(engine, 'run_codex', side_effect=review):
+            audit = engine.audit_editorial_translation(config, lambda _: None)
+        self.assertEqual(audit['status'], 'aprovado')
+        self.assertEqual(audit['pares_totais'], 2)
+        self.assertEqual(audit['pares_liberados_localmente'], 1)
+        self.assertEqual(audit['pares_revisados'], 1)
+        self.assertTrue((config.output / 'validacao_local.json').exists())
+
     def test_partial_epub_keeps_original_remainder_and_assets(self):
         config = self.config()
         qa = self.run_epub(config)

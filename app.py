@@ -134,7 +134,7 @@ def publish_project(project: Path, original_source: Path, config: JobConfig, qa:
         assets = work_dir / name
         if assets.exists():
             shutil.copytree(assets, delivery_dir / name, dirs_exist_ok=True)
-    for name in ("relatorio_qa.json", "auditoria_traducao.json", "manifesto.json", "custo.json", "RELATORIO_VALIDACAO.md"):
+    for name in ("relatorio_qa.json", "validacao_local.json", "auditoria_traducao.json", "manifesto.json", "custo.json", "RELATORIO_VALIDACAO.md"):
         source = work_dir / name
         if source.exists():
             shutil.copy2(source, reports_dir / name)

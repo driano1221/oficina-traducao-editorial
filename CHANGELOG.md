@@ -2,6 +2,11 @@
 
 ## Não lançado — 2026-09-13
 
+- Benchmark privado de 140 elementos congelado por hashes e resultados agregados, sem texto protegido no repositório.
+- Triagem local de números, fórmulas, HTML e glossário antes da auditoria semântica.
+- Auditoria seletiva com payload textual compacto e relatório `validacao_local.json`.
+- Cinco regressões reais conhecidas cobertas; redução estimada de 20,4% no payload semântico do benchmark.
+- Suíte ampliada para 27 testes.
 - Minilivro sintético de dois capítulos, original e tradução real em EPUB.
 - Comparativos visuais de tabela/equação e figura/notas, mais screenshot da interface.
 - Fonte reproduzível, verificações de integridade e custo sanitizado.

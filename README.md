@@ -78,7 +78,7 @@ Equivalente API registrado: **US$ 0,0875 na execução final**; **US$ 0,1791 inc
 - Mantém links, identificadores e atributos dos elementos traduzidos; rejeita respostas que alterem essa estrutura.
 - Usa glossário editável e cache por conteúdo, modelo e instruções.
 - Separa livros e configurações diferentes em projetos distintos.
-- Gera relatórios de estrutura e, nos modos editoriais, revisão bilíngue automática.
+- Gera relatórios de estrutura, validação local e auditoria bilíngue seletiva nos modos editoriais.
 - Mostra estimativa antes da execução e equivalente API ao final, quando há dados de uso.
 
 ## Escolha o caminho
@@ -139,6 +139,7 @@ A estimativa usa uma tabela local de preços de referência e o câmbio informad
 app.py                interface e organização da biblioteca
 tradutor.py           extração, tradução, exportação, QA e custo
 glossario.json        terminologia padrão, editável
+benchmarks/           trava de regressão por hashes, sem publicar livros privados
 tests/                testes com conteúdo sintético
 docs/                 uso, decisões, limites e validação
 .github/workflows/    testes no Windows
@@ -146,7 +147,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 24 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 27 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. A auditoria semântica agora recebe apenas trechos selecionados por risco; números, fórmulas, estrutura e expressões inequívocas do glossário são verificados localmente. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 
