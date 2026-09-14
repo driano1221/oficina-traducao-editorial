@@ -18,7 +18,7 @@ python tradutor.py self-test
 python -m py_compile tradutor.py app.py
 ```
 
-23 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
+24 testes locais passaram em Python 3.11. O workflow do GitHub repete a suíte no Windows com Python 3.11 e 3.12.
 
 | Contrato | Cobertura |
 | --- | --- |

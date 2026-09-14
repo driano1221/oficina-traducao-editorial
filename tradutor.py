@@ -1249,6 +1249,10 @@ def write_translated_epub(source_epub: Path, output_epub: Path, documents: list[
     os.replace(temporary, output_epub)
 
 
+def is_chapter_label(label: str) -> bool:
+    return bool(re.search(r"(?:^\s*\d+\.\s+\S)|(?:第\s*[一二三四五六七八九十百\d]+\s*章)|(?:\b(?:chapter|capítulo)\s+\d+)", label, re.I))
+
+
 def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     ncx_item = next((node for node in manifest.values() if node.get("media-type") == "application/x-dtbncx+xml"), None)
@@ -1258,7 +1262,7 @@ def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[
         for navpoint in ncx.findall(".//{*}navPoint"):
             label = "".join(navpoint.findtext("./{*}navLabel/{*}text", default="")).strip()
             content = navpoint.find("./{*}content")
-            if content is None or not re.search(r"(?:第\s*[一二三四五六七八九十百\d]+\s*章)|(?:\b(?:chapter|capítulo)\s+\d+)", label, re.I):
+            if content is None or not is_chapter_label(label):
                 continue
             href = urllib.parse.unquote(content.get("src", "").split("#", 1)[0])
             entries.append((posixpath.normpath(posixpath.join(posixpath.dirname(ncx_name), href)), label))
@@ -1270,7 +1274,7 @@ def epub_chapter_starts(archive: zipfile.ZipFile, opf_name: str, manifest: dict[
         nav = BeautifulSoup(archive.read(nav_name), "html.parser")
         for link in nav.find_all("a", href=True):
             label = link.get_text(" ", strip=True)
-            if not re.search(r"(?:第\s*[一二三四五六七八九十百\d]+\s*章)|(?:\b(?:chapter|capítulo)\s+\d+)", label, re.I):
+            if not is_chapter_label(label):
                 continue
             href = urllib.parse.unquote(link["href"].split("#", 1)[0])
             entries.append((posixpath.normpath(posixpath.join(posixpath.dirname(nav_name), href)), label))

@@ -21,7 +21,7 @@ py -3.11 -m venv .venv
 Escolha um PDF/EPUB e uma pasta de biblioteca fora do repositório, se preferir. Leia o diagnóstico de entrada. Comece por um recorte curto.
 
 - PDF: `1-10`, `1-10,15` ou livro inteiro. As páginas são físicas, contando capa e sumário.
-- EPUB: primeiros N capítulos reconhecidos ou todos os capítulos detectados. Isso não equivale necessariamente ao livro inteiro: apêndices e matéria inicial dependem do sumário e do spine.
+- EPUB: primeiros N capítulos reconhecidos ou todos os capítulos detectados. O reconhecimento aceita títulos como `1. Introduction`, `Chapter 1`, `Capítulo 1` e `第1章`, sem tratar seções decimais como `2.1 Background` como capítulos. Isso não equivale necessariamente ao livro inteiro: apêndices e matéria inicial dependem do sumário e do spine.
 - EPUB por páginas: sequência contínua começando em 1. Exige marcadores `pg_N` com `role="doc-pagebreak"`. Limites dentro de parágrafos são recusados para não perder texto.
 - URL editorial: opção experimental, apenas em PDF. Cada URL deve conter `<article>`. Todo o artigo é processado, independentemente das páginas selecionadas no PDF.
 

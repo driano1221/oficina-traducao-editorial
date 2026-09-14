@@ -89,6 +89,12 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(inventory['chapters']), 2)
         self.assertEqual(inventory['printed_pages'], 2)
 
+    def test_numbered_chapter_label_does_not_match_decimal_section(self):
+        self.assertTrue(engine.is_chapter_label('1. Introduction'))
+        self.assertTrue(engine.is_chapter_label('Chapter 2: Methods'))
+        self.assertFalse(engine.is_chapter_label('2.1 Background'))
+        self.assertFalse(engine.is_chapter_label('Figure 2.1 Results'))
+
     def test_disclosure_summary_is_translated_with_structure_preserved(self):
         config = self.config(chapters=1)
         self.run_epub(config)

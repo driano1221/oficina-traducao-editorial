@@ -89,7 +89,7 @@ Equivalente API registrado: **US$ 0,0875 na execução final**; **US$ 0,1791 inc
 | PDF com texto extraível | PDF + HTML + Markdown | Imagem da página original para conferência e texto traduzido; sem reconstrução geométrica |
 | HTML oficial com `<article>`, informado manualmente | PDF + HTML + texto | Experimental: traduz os artigos inteiros; o intervalo do PDF não recorta essas URLs |
 
-EPUB não tem paginação fixa. O recorte por página só funciona com marcadores `pg_N` compatíveis. Capítulos são reconhecidos por títulos como `Chapter 1`, `Capítulo 1` e `第1章`, em documentos separados. Nem todo EPUB usa esse formato.
+EPUB não tem paginação fixa. O recorte por página só funciona com marcadores `pg_N` compatíveis. Capítulos são reconhecidos por títulos como `1. Introduction`, `Chapter 1`, `Capítulo 1` e `第1章`, em documentos separados. Seções decimais como `2.1 Background` não são confundidas com capítulos. Nem todo EPUB usa um desses formatos.
 
 ## Rodar
 
@@ -146,7 +146,7 @@ docs/                 uso, decisões, limites e validação
 
 ## Estado
 
-Beta de estudo. Há 23 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
+Beta de estudo. Há 24 testes automatizados com dados sintéticos, sem chamadas pagas na suíte, além das execuções reais do minilivro e da seção do livro aberto documentadas acima. Isso verifica contratos do pipeline e essas amostras; não prova qualidade de tradução em qualquer livro.
 
 Não faz OCR, não remove DRM, não traduz diagramas rasterizados automaticamente e não promete fidelidade visual absoluta. Uma revisão humana continua necessária. Não use documentos não confiáveis ou sensíveis sem avaliar os riscos.
 
